@@ -8,7 +8,7 @@
   "configurePresets": [
     {
       "name": "debug",
-      "displayName": "Debug",
+      "displayName": "Debug (Makefiles)",
       "generator": "MinGW Makefiles",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
@@ -18,9 +18,29 @@
     },
     {
       "name": "release",
-      "displayName": "Release",
+      "displayName": "Release (Makefiles)",
       "generator": "MinGW Makefiles",
       "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ASTRAGLYPH_ENABLE_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-ninja",
+      "displayName": "Debug (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/debug-ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ASTRAGLYPH_ENABLE_TESTS": "ON"
+      }
+    },
+    {
+      "name": "release-ninja",
+      "displayName": "Release (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release-ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "ASTRAGLYPH_ENABLE_TESTS": "ON"
@@ -37,12 +57,30 @@
       "name": "release",
       "configurePreset": "release",
       "configuration": "Release"
+    },
+    {
+      "name": "debug-ninja",
+      "configurePreset": "debug-ninja",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release-ninja",
+      "configurePreset": "release-ninja",
+      "configuration": "Release"
     }
   ],
   "testPresets": [
     {
       "name": "debug",
       "configurePreset": "debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "debug-ninja",
+      "configurePreset": "debug-ninja",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true

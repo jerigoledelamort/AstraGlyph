@@ -1,7 +1,7 @@
 set(_ASTRAGLYPH_SDL3_VERSION "3.2.16")
 set(_ASTRAGLYPH_SDL3_ARCHIVE_NAME "SDL3-${_ASTRAGLYPH_SDL3_VERSION}.zip")
 set(_ASTRAGLYPH_SDL3_SOURCE_DIRNAME "SDL3-${_ASTRAGLYPH_SDL3_VERSION}")
-set(_ASTRAGLYPH_SDL3_URL "https://libsdl.org/release/${_ASTRAGLYPH_SDL3_ARCHIVE_NAME}")
+set(_ASTRAGLYPH_SDL3_URL "https://github.com/libsdl-org/SDL/releases/download/release-${_ASTRAGLYPH_SDL3_VERSION}/${_ASTRAGLYPH_SDL3_ARCHIVE_NAME}")
 set(_ASTRAGLYPH_SDL3_SHA256 "0cc7430fb827c1f843e31b8b26ba7f083b1eeb8f6315a65d3744fd4d25b6c373")
 
 function(astraglyph_make_generator_key input out_var)
@@ -104,6 +104,8 @@ function(astraglyph_ensure_sdl3_archive archive_path)
       EXPECTED_HASH "SHA256=${_ASTRAGLYPH_SDL3_SHA256}"
       SHOW_PROGRESS
       STATUS download_status
+      TIMEOUT 120
+      INACTIVITY_TIMEOUT 30
     )
     list(GET download_status 0 download_code)
     list(GET download_status 1 download_message)
@@ -193,13 +195,11 @@ function(astraglyph_bootstrap_local_sdl3 dependency_root install_prefix build_ty
   astraglyph_collect_sdl3_cmake_args("${install_prefix}" "${build_type}" sdl3_cmake_args)
   astraglyph_sdl3_bootstrap_signature(signature)
 
-  if(EXISTS "${build_dir}")
-    file(REMOVE_RECURSE "${build_dir}")
+  if(NOT EXISTS "${build_dir}")
+    file(MAKE_DIRECTORY "${build_dir}")
+  else()
+    message(STATUS "Reusing existing SDL3 build directory: ${build_dir}")
   endif()
-  if(EXISTS "${install_prefix}")
-    file(REMOVE_RECURSE "${install_prefix}")
-  endif()
-  file(MAKE_DIRECTORY "${build_dir}")
 
   message(STATUS "Bootstrapping persistent local SDL3 package: ${install_prefix}")
   execute_process(
@@ -223,13 +223,42 @@ function(astraglyph_bootstrap_local_sdl3 dependency_root install_prefix build_ty
   file(WRITE "${install_prefix}/astraglyph-sdl3.stamp" "${signature}")
 endfunction()
 
+function(astraglyph_ensure_json_header dependency_root out_include_dir)
+  set(json_include_dir "${dependency_root}/include")
+  set(json_path "${json_include_dir}/nlohmann/json.hpp")
+
+  if(NOT EXISTS "${json_path}")
+    message(STATUS "Downloading nlohmann/json single header")
+    file(MAKE_DIRECTORY "${json_include_dir}/nlohmann")
+    file(
+      DOWNLOAD
+      "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp"
+      "${json_path}"
+      STATUS download_status
+      TIMEOUT 60
+      INACTIVITY_TIMEOUT 15
+    )
+    list(GET download_status 0 download_code)
+    list(GET download_status 1 download_message)
+    if(NOT download_code EQUAL 0)
+      message(FATAL_ERROR "Failed to download nlohmann/json: ${download_message}")
+    endif()
+  endif()
+
+  set(${out_include_dir} "${json_include_dir}" PARENT_SCOPE)
+endfunction()
+
 function(astraglyph_find_dependencies)
   set(
     ASTRAGLYPH_DEPENDENCY_ROOT
-    "${PROJECT_SOURCE_DIR}/build/deps"
+    "${PROJECT_SOURCE_DIR}/.cache/deps"
     CACHE PATH
     "Persistent third-party dependency root reused across clean builds"
   )
+  message(STATUS "AstraGlyph dependency root: ${ASTRAGLYPH_DEPENDENCY_ROOT}")
+
+  astraglyph_ensure_json_header("${ASTRAGLYPH_DEPENDENCY_ROOT}" ASTRAGLYPH_JSON_INCLUDE_DIR)
+  set(ASTRAGLYPH_JSON_INCLUDE_DIR "${ASTRAGLYPH_JSON_INCLUDE_DIR}" PARENT_SCOPE)
 
   if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(build_type "Release")

@@ -8,7 +8,7 @@
 namespace astraglyph {
 namespace {
 
-constexpr std::string_view kClassicRamp = " .:-=+*#%@";
+constexpr std::string_view kClassicRamp = "@#$S%?&*iI:-. ";
 constexpr std::string_view kDenseRamp = " `'.,:^~\";!i<>-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 constexpr std::string_view kBlocksRamp = " .:=*#@";
 
@@ -34,8 +34,9 @@ float clamp01(float value) noexcept
 char AsciiMapper::mapLuminanceToGlyph(float luminance, GlyphRampMode mode) const noexcept
 {
   const float clamped = clamp01(luminance);
+  const float inverted = 1.0F - clamped;
   const std::string_view ramp = rampForMode(mode);
-  const auto index = static_cast<std::size_t>(clamped * static_cast<float>(ramp.size() - 1U));
+  const auto index = static_cast<std::size_t>(inverted * static_cast<float>(ramp.size() - 1U));
   return ramp[index];
 }
 

@@ -18,6 +18,11 @@ struct AsciiCell {
   float depth{std::numeric_limits<float>::infinity()};
   Vec3 radiance{};
   int sampleCount{0};
+
+  // Temporal accumulation state (cell-level, not pixel-level)
+  Vec3 accumulatedRadiance{};
+  float accumulatedLuminance{0.0F};
+  int accumulatedFrames{0};
 };
 
 class AsciiFramebuffer {

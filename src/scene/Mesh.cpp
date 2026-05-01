@@ -1,8 +1,36 @@
 #include "scene/Mesh.hpp"
 
+#include <cmath>
 #include <utility>
 
 namespace astraglyph {
+namespace {
+
+[[nodiscard]] Vec3 rotatePoint(const Vec3& p, float yaw, float pitch, float roll) noexcept
+{
+  const float cy = std::cos(yaw);
+  const float sy = std::sin(yaw);
+  const float cp = std::cos(pitch);
+  const float sp = std::sin(pitch);
+  const float cr = std::cos(roll);
+  const float sr = std::sin(roll);
+
+  const float x1 = cy * p.x + sy * p.z;
+  const float z1 = -sy * p.x + cy * p.z;
+  const float y1 = p.y;
+
+  const float x2 = x1;
+  const float y2 = cp * y1 - sp * z1;
+  const float z2 = sp * y1 + cp * z1;
+
+  const float x3 = cr * x2 - sr * y2;
+  const float y3 = sr * x2 + cr * y2;
+  const float z3 = z2;
+
+  return Vec3{x3, y3, z3};
+}
+
+} // namespace
 
 Mesh::Mesh(int materialId) noexcept
     : materialId_{materialId}
@@ -22,6 +50,29 @@ void Mesh::translate(Vec3 offset) noexcept
     triangle.v0 += offset;
     triangle.v1 += offset;
     triangle.v2 += offset;
+  }
+  recomputeBounds();
+}
+
+void Mesh::scale(Vec3 factor) noexcept
+{
+  for (Triangle& triangle : triangles_) {
+    triangle.v0.x *= factor.x; triangle.v0.y *= factor.y; triangle.v0.z *= factor.z;
+    triangle.v1.x *= factor.x; triangle.v1.y *= factor.y; triangle.v1.z *= factor.z;
+    triangle.v2.x *= factor.x; triangle.v2.y *= factor.y; triangle.v2.z *= factor.z;
+  }
+  recomputeBounds();
+}
+
+void Mesh::rotate(float yaw, float pitch, float roll) noexcept
+{
+  for (Triangle& triangle : triangles_) {
+    triangle.v0 = rotatePoint(triangle.v0, yaw, pitch, roll);
+    triangle.v1 = rotatePoint(triangle.v1, yaw, pitch, roll);
+    triangle.v2 = rotatePoint(triangle.v2, yaw, pitch, roll);
+    triangle.n0 = normalize(rotatePoint(triangle.n0, yaw, pitch, roll));
+    triangle.n1 = normalize(rotatePoint(triangle.n1, yaw, pitch, roll));
+    triangle.n2 = normalize(rotatePoint(triangle.n2, yaw, pitch, roll));
   }
   recomputeBounds();
 }

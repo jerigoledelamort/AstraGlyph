@@ -25,6 +25,10 @@ struct RenderMetrics {
   std::uint64_t adaptiveCells{0};
   std::uint64_t totalCells{0};
   int maxBounceReached{0};
+  int accumulatedFrames{0};
+  bool temporalAccumulation{false};
+  int threadCountUsed{0};
+  bool enableMultithreading{false};
 };
 
 } // namespace astraglyph

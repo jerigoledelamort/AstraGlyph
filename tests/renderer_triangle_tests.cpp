@@ -2,6 +2,7 @@
 #include "render/Renderer.hpp"
 #include "render/RenderSettings.hpp"
 #include "scene/Camera.hpp"
+#include "scene/Scene.hpp"
 
 #include <cassert>
 #include <cstddef>
@@ -22,9 +23,10 @@ int main()
   Camera camera;
   camera.setAspect(static_cast<float>(settings.gridWidth) / static_cast<float>(settings.gridHeight));
 
+  const Scene scene = Scene::createDefaultScene();
   AsciiFramebuffer framebuffer;
   const Renderer renderer;
-  renderer.render(framebuffer, camera, settings);
+  renderer.render(framebuffer, camera, scene, settings);
 
   std::size_t visibleCells = 0;
   for (const AsciiCell& cell : framebuffer.data()) {

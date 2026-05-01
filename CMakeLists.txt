@@ -21,12 +21,12 @@ astraglyph_find_dependencies()
 
 set(ASTRAGLYPH_ENGINE_SOURCES
   src/app/Application.cpp
-  src/app/MainLoop.cpp
   src/platform/Window.cpp
   src/platform/Input.cpp
   src/platform/Time.cpp
   src/core/Log.cpp
   src/scene/Scene.cpp
+  src/scene/SceneLoader.cpp
   src/scene/Camera.cpp
   src/scene/Mesh.cpp
   src/geometry/Triangle.cpp
@@ -44,6 +44,7 @@ set(ASTRAGLYPH_ENGINE_SOURCES
 
 add_library(astraglyph_engine STATIC ${ASTRAGLYPH_ENGINE_SOURCES})
 target_include_directories(astraglyph_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(astraglyph_engine SYSTEM PUBLIC "${ASTRAGLYPH_JSON_INCLUDE_DIR}")
 target_link_libraries(astraglyph_engine PUBLIC ${ASTRAGLYPH_SDL3_TARGET})
 astraglyph_apply_project_options(astraglyph_engine)
 astraglyph_set_warnings(astraglyph_engine ${ASTRAGLYPH_WARNINGS_AS_ERRORS})

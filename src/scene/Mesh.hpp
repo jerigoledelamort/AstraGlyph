@@ -17,6 +17,8 @@ public:
 
   void addTriangle(Triangle triangle);
   void translate(Vec3 offset) noexcept;
+  void scale(Vec3 factor) noexcept;
+  void rotate(float yaw, float pitch, float roll) noexcept;
   void setMaterialId(int materialId) noexcept;
   void setName(std::string name);
   void setGroupName(std::string groupName);

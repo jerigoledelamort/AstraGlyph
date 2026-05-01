@@ -7,6 +7,8 @@
 #include "render/Renderer.hpp"
 #include "render/RenderSettings.hpp"
 #include "scene/Camera.hpp"
+#include "scene/Scene.hpp"
+#include "scene/SceneLoader.hpp"
 #include "ui/DebugOverlay.hpp"
 #include "ui/SettingsPanel.hpp"
 
@@ -25,6 +27,14 @@ private:
   void render();
   void handleRuntimeSettingsInput();
   void updateWindowTitle();
+  void renderGlyph(
+      char glyph,
+      int x,
+      int y,
+      int cellWidth,
+      int cellHeight,
+      const Vec3& fgColor,
+      const Vec3& bgColor);
   void renderOverlayText(
       const std::vector<std::string>& lines,
       int originX,
@@ -41,6 +51,7 @@ private:
   DebugOverlay debugOverlay_{};
   SettingsPanel settingsPanel_{};
   AsciiFramebuffer framebuffer_{};
+  Scene scene_{};
   std::string baseTitle_{};
 };
 

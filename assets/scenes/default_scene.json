@@ -1,0 +1,119 @@
+{
+  "camera": {
+    "position": [0.0, 0.0, 0.0],
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "fov": 70.0
+  },
+  "renderSettings": {
+    "gridWidth": 160,
+    "gridHeight": 90,
+    "samplesPerCell": 4,
+    "maxSamplesPerCell": 16,
+    "jitteredSampling": true,
+    "adaptiveSampling": true,
+    "adaptiveVarianceThreshold": 0.02,
+    "temporalAccumulation": true,
+    "enableShadows": true,
+    "enableSoftShadows": true,
+    "shadowSamples": 4,
+    "enableReflections": true,
+    "maxBounces": 2,
+    "enableBvh": true,
+    "enableMultithreading": true,
+    "threadCount": 0,
+    "exposure": 1.0,
+    "gamma": 2.2,
+    "colorOutput": true,
+    "glyphRampMode": "Classic",
+    "ambientStrength": 0.05,
+    "backgroundColor": [0.01, 0.01, 0.015]
+  },
+  "materials": [
+    {
+      "name": "floor",
+      "albedo": [0.72, 0.72, 0.70],
+      "roughness": 0.8,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.0
+    },
+    {
+      "name": "cube",
+      "albedo": [0.90, 0.58, 0.35],
+      "roughness": 0.65,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.5
+    },
+    {
+      "name": "sphere",
+      "albedo": [0.40, 0.62, 0.95],
+      "roughness": 0.45,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 1.0
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [-0.55, -1.0, -0.45],
+      "color": [1.0, 0.96, 0.90],
+      "intensity": 0.65
+    },
+    {
+      "type": "point",
+      "position": [1.35, 1.25, 1.0],
+      "color": [0.65, 0.78, 1.0],
+      "intensity": 0.35
+    },
+    {
+      "type": "area",
+      "position": [0.0, 1.35, -1.2],
+      "color": [1.0, 0.95, 0.88],
+      "intensity": 1.05,
+      "right": [1.0, 0.0, 0.0],
+      "up": [0.0, 0.0, 1.0],
+      "width": 2.0,
+      "height": 1.6
+    }
+  ],
+  "objects": [
+    {
+      "type": "plane",
+      "material": "floor",
+      "size": [5.0, 1.0, 5.0],
+      "transform": {
+        "position": [0.0, -0.9, -1.6],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "cube",
+      "size": [0.75, 0.75, 0.75],
+      "transform": {
+        "position": [-0.65, -0.45, -0.9],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "sphere",
+      "material": "sphere",
+      "radius": 0.45,
+      "segments": 24,
+      "rings": 12,
+      "transform": {
+        "position": [0.75, -0.35, -1.25],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    }
+  ]
+}

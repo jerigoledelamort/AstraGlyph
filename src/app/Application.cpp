@@ -84,6 +84,11 @@ constexpr int kLineSpacing = 2;
 Application::Application()
     : window_{1280, 720, "AstraGlyph / AsciiTracer"}, baseTitle_{"AstraGlyph / AsciiTracer"}
 {
+  const auto result = SceneLoader::loadFromFile("assets/scenes/default_scene.json");
+  scene_ = std::move(result.scene);
+  camera_ = result.camera;
+  renderSettings_ = result.renderSettings;
+
   camera_.setAspect(static_cast<float>(window_.width()) / static_cast<float>(window_.height()));
   debugOverlay_.setVisible(renderSettings_.showDebugInfo);
 }
@@ -112,7 +117,7 @@ void Application::update(double dt)
 void Application::render()
 {
   renderSettings_.validate();
-  renderer_.render(framebuffer_, camera_, renderSettings_);
+  renderer_.render(framebuffer_, camera_, scene_, renderSettings_);
   renderSettings_.clearDirtyState();
   ++renderSettings_.frameIndex;
 
@@ -134,8 +139,8 @@ void Application::render()
       const int cellWidth = std::max(1, x1 - x0);
 
       const AsciiCell& cell = framebuffer_.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
-      Vec3 color = renderSettings_.colorOutput ? cell.fg : Vec3{cell.luminance, cell.luminance, cell.luminance};
-      window_.drawFilledRect(x0, y0, cellWidth, cellHeight, color);
+      Vec3 fg = renderSettings_.colorOutput ? cell.fg : Vec3{cell.luminance, cell.luminance, cell.luminance};
+      renderGlyph(cell.glyph, x0, y0, cellWidth, cellHeight, fg, cell.bg);
     }
   }
 
@@ -203,6 +208,51 @@ void Application::handleRuntimeSettingsInput()
   }
   if (input_.wasKeyPressed(Key::Equals)) {
     renderSettings_.adjustSecondaryQuality(1);
+  }
+}
+
+void Application::renderGlyph(
+    char glyph,
+    int x,
+    int y,
+    int cellWidth,
+    int cellHeight,
+    const Vec3& fgColor,
+    const Vec3& bgColor)
+{
+  if (bgColor.x > 0.0F || bgColor.y > 0.0F || bgColor.z > 0.0F) {
+    window_.drawFilledRect(x, y, cellWidth, cellHeight, bgColor);
+  }
+
+  if (glyph == ' ') {
+    return;
+  }
+
+  const int scale = std::min(cellWidth / kGlyphPixelWidth, cellHeight / kGlyphPixelHeight);
+  if (scale <= 0) {
+    window_.drawFilledRect(x, y, cellWidth, cellHeight, fgColor);
+    return;
+  }
+
+  const char character = static_cast<char>(std::toupper(static_cast<unsigned char>(glyph)));
+  const auto pattern = glyphPattern(character);
+  const int drawWidth = kGlyphPixelWidth * scale;
+  const int drawHeight = kGlyphPixelHeight * scale;
+  const int offsetX = x + (cellWidth - drawWidth) / 2;
+  const int offsetY = y + (cellHeight - drawHeight) / 2;
+
+  for (int row = 0; row < kGlyphPixelHeight; ++row) {
+    for (int column = 0; column < kGlyphPixelWidth; ++column) {
+      if (pattern[static_cast<std::size_t>(row)][static_cast<std::size_t>(column)] != '1') {
+        continue;
+      }
+      window_.drawFilledRect(
+          offsetX + column * scale,
+          offsetY + row * scale,
+          scale,
+          scale,
+          fgColor);
+    }
   }
 }
 

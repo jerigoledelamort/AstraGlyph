@@ -64,7 +64,13 @@ std::vector<std::string> SettingsPanel::buildLines(const RenderSettings& setting
   stream.clear();
   stream << "REFLECTIONS " << enabledLabel(settings.enableReflections)
          << "  BOUNCES " << settings.maxBounces
-         << "  BVH " << enabledLabel(settings.enableBvh);
+         << "  BVH " << enabledLabel(settings.enableBvh)
+         << "  MT " << enabledLabel(settings.enableMultithreading);
+  lines.push_back(stream.str());
+
+  stream.str({});
+  stream.clear();
+  stream << "THREADS " << (settings.threadCount == 0 ? "AUTO" : std::to_string(settings.threadCount));
   lines.push_back(stream.str());
 
   stream.str({});

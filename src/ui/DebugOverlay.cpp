@@ -78,6 +78,14 @@ std::vector<std::string> DebugOverlay::buildLines(
          << "  COLOR " << enabledLabel(settings.colorOutput);
   lines.push_back(stream.str());
 
+  stream.str({});
+  stream.clear();
+  stream << "ACCUM: " << metrics.accumulatedFrames << " FRAMES"
+         << "  TEMPORAL: " << enabledLabel(settings.temporalAccumulation)
+         << "  MT: " << enabledLabel(settings.enableMultithreading)
+         << "  THREADS: " << metrics.threadCountUsed;
+  lines.push_back(stream.str());
+
   return lines;
 }
 

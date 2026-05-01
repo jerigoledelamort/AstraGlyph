@@ -27,13 +27,15 @@ struct RenderSettings {
   bool jitteredSampling{true};
   bool adaptiveSampling{true};
   float adaptiveVarianceThreshold{0.02F};
-  bool temporalAccumulation{false};
+  bool temporalAccumulation{true};
   bool enableShadows{true};
   bool enableSoftShadows{true};
   int shadowSamples{4};
   bool enableReflections{true};
   int maxBounces{2};
   bool enableBvh{true};
+  bool enableMultithreading{true};
+  int threadCount{0};
   float exposure{1.0F};
   float gamma{2.2F};
   bool colorOutput{true};
@@ -62,6 +64,7 @@ struct RenderSettings {
     shadowSamples = std::clamp(shadowSamples, 1, 16);
     maxBounces = std::clamp(maxBounces, 0, 8);
     bvhLeafSize = std::clamp(bvhLeafSize, 1, 16);
+    threadCount = std::clamp(threadCount, 0, 64);
     adaptiveVarianceThreshold = std::clamp(adaptiveVarianceThreshold, -1.0F, 1.0F);
     exposure = std::clamp(exposure, 0.01F, 8.0F);
     gamma = std::clamp(gamma, 0.1F, 4.0F);

@@ -6,6 +6,7 @@
 #include "render/RenderMetrics.hpp"
 #include "render/RenderSettings.hpp"
 #include "scene/Camera.hpp"
+#include "scene/Scene.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -195,11 +196,12 @@ int main()
     AsciiFramebuffer bruteFramebuffer;
     AsciiFramebuffer bvhFramebuffer;
     Renderer renderer;
+    const Scene scene = Scene::createDefaultScene();
 
-    renderer.render(bruteFramebuffer, camera, bruteSettings);
+    renderer.render(bruteFramebuffer, camera, scene, bruteSettings);
     const RenderMetrics bruteMetrics = renderer.metrics();
 
-    renderer.render(bvhFramebuffer, camera, bvhSettings);
+    renderer.render(bvhFramebuffer, camera, scene, bvhSettings);
     const RenderMetrics bvhMetrics = renderer.metrics();
 
     assert(bruteFramebuffer.width() == bvhFramebuffer.width());

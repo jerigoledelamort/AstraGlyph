@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <thread>
+#include <vector>
 
 namespace astraglyph {
 namespace {
@@ -88,41 +90,74 @@ bool Renderer::requiresAccumulationReset(
          current.backgroundColor.z != previous.backgroundColor.z;
 }
 
-void Renderer::render(AsciiFramebuffer& framebuffer, const Camera& camera, const RenderSettings& settings) const
+bool Renderer::requiresAccumulationReset(
+    const CameraState& current,
+    const CameraState& previous) noexcept
 {
-  RenderSettings activeSettings = settings;
-  activeSettings.validate();
+  return current.position.x != previous.position.x ||
+         current.position.y != previous.position.y ||
+         current.position.z != previous.position.z ||
+         current.yaw != previous.yaw ||
+         current.pitch != previous.pitch ||
+         current.fovY != previous.fovY ||
+         current.aspect != previous.aspect;
+}
 
-  accumulationDirty_ = !hasAppliedSettings_ ||
-                       activeSettings.accumulationDirty ||
-                       requiresAccumulationReset(activeSettings, appliedSettings_);
-  appliedSettings_ = activeSettings;
-  hasAppliedSettings_ = true;
+void Renderer::mergeMetrics(
+    RenderMetrics& dest,
+    const RenderMetrics& src)
+{
+  dest.primaryRays += src.primaryRays;
+  dest.secondaryRays += src.secondaryRays;
+  dest.reflectionRays += src.reflectionRays;
+  dest.shadowRays += src.shadowRays;
+  dest.occludedShadowRays += src.occludedShadowRays;
+  dest.shadowQueries += src.shadowQueries;
+  dest.bvhNodeTests += src.bvhNodeTests;
+  dest.bvhAabbTests += src.bvhAabbTests;
+  dest.triangleTests += src.triangleTests;
+  dest.bvhLeafTests += src.bvhLeafTests;
+  dest.hits += src.hits;
+  dest.misses += src.misses;
+  dest.adaptiveCells += src.adaptiveCells;
+  dest.maxSamplesUsed = std::max(dest.maxSamplesUsed, src.maxSamplesUsed);
+  dest.maxBounceReached = std::max(dest.maxBounceReached, src.maxBounceReached);
+  dest.bvhNodes = std::max(dest.bvhNodes, src.bvhNodes);
+  dest.bvhLeaves = std::max(dest.bvhLeaves, src.bvhLeaves);
+  dest.accumulatedFrames = std::max(dest.accumulatedFrames, src.accumulatedFrames);
 
-  const int targetWidth = std::max(activeSettings.gridWidth, 1);
-  const int targetHeight = std::max(activeSettings.gridHeight, 1);
-  if (framebuffer.width() != static_cast<std::size_t>(targetWidth) ||
-      framebuffer.height() != static_cast<std::size_t>(targetHeight)) {
-    framebuffer.resize(static_cast<std::size_t>(targetWidth), static_cast<std::size_t>(targetHeight));
+  if (dest.shadowQueries > 0 && src.shadowQueries > 0) {
+    dest.averageShadowSamples =
+        (dest.averageShadowSamples * static_cast<float>(dest.shadowQueries - src.shadowQueries) +
+         src.averageShadowSamples * static_cast<float>(src.shadowQueries)) /
+        static_cast<float>(dest.shadowQueries);
+  } else if (src.shadowQueries > 0) {
+    dest.averageShadowSamples = src.averageShadowSamples;
   }
+}
 
-  framebuffer.clear();
-  metrics_ = RenderMetrics{};
-  metrics_.totalCells = static_cast<std::uint64_t>(targetWidth) * static_cast<std::uint64_t>(targetHeight);
-
-  static const Scene scene = Scene::createDefaultScene();
-  sceneTriangleCount_ = scene.triangles().size();
-  if (activeSettings.enableBvh) {
-    rayTracer_.buildAcceleration(scene.triangles(), activeSettings.bvhLeafSize);
-  }
-
+void Renderer::renderTile(
+    AsciiFramebuffer& framebuffer,
+    const Camera& camera,
+    const Scene& scene,
+    const RenderSettings& settings,
+    int yStart,
+    int yEnd,
+    bool accumulationDirty,
+    TileResult& result) const
+{
+  const int targetWidth = settings.gridWidth;
+  const bool temporalOn = settings.temporalAccumulation;
   AsciiMapper mapper;
   Sampler sampler;
-  const int baseSamples = clampConfiguredSamples(activeSettings.samplesPerCell);
-  const int maxSamples = std::max(baseSamples, clampConfiguredSamples(activeSettings.maxSamplesPerCell));
-  std::uint64_t totalSamplesUsed = 0;
+  const int baseSamples = clampConfiguredSamples(settings.samplesPerCell);
+  const int maxSamples = std::max(baseSamples, clampConfiguredSamples(settings.maxSamplesPerCell));
 
-  for (int y = 0; y < targetHeight; ++y) {
+  result.metrics = RenderMetrics{};
+  result.maxAccumulatedFrames = 0;
+  result.totalSamplesUsed = 0;
+
+  for (int y = yStart; y < yEnd; ++y) {
     for (int x = 0; x < targetWidth; ++x) {
       Vec3 radianceSum{};
       Vec3 displaySum{};
@@ -132,18 +167,18 @@ void Renderer::render(AsciiFramebuffer& framebuffer, const Camera& camera, const
       int sampleCount = 0;
 
       const auto traceSample = [&](int sampleIndex) {
-        const Sample sample = sampler.generateSubCellSample(x, y, sampleIndex, activeSettings);
+        const Sample sample = sampler.generateSubCellSample(x, y, sampleIndex, settings);
         const float u =
             (static_cast<float>(x) + sample.uv.x) / static_cast<float>(targetWidth);
         const float v =
-            (static_cast<float>(y) + sample.uv.y) / static_cast<float>(targetHeight);
+            (static_cast<float>(y) + sample.uv.y) / static_cast<float>(settings.gridHeight);
         const Ray ray = camera.generateRay(u, v);
         HitInfo hit{};
-        const Vec3 radiance = integrator_.traceRadiance(ray, scene, rayTracer_, activeSettings, metrics_, &hit);
+        const Vec3 radiance = integrator_.traceRadiance(ray, scene, rayTracer_, settings, result.metrics, &hit);
 
-        Vec3 display = mapper.applyExposureGamma(radiance, activeSettings.exposure, activeSettings.gamma);
+        Vec3 display = mapper.applyExposureGamma(radiance, settings.exposure, settings.gamma);
         const float luminance = mapper.radianceToLuminance(display);
-        if (!activeSettings.colorOutput) {
+        if (!settings.colorOutput) {
           display = Vec3{luminance, luminance, luminance};
         }
 
@@ -162,8 +197,8 @@ void Renderer::render(AsciiFramebuffer& framebuffer, const Camera& camera, const
       }
 
       bool usedAdaptiveSampling = false;
-      if (activeSettings.adaptiveSampling && sampleCount < maxSamples &&
-          luminanceVariance.variance() > activeSettings.adaptiveVarianceThreshold) {
+      if (settings.adaptiveSampling && sampleCount < maxSamples &&
+          luminanceVariance.variance() > settings.adaptiveVarianceThreshold) {
         usedAdaptiveSampling = true;
         for (int sampleIndex = sampleCount; sampleIndex < maxSamples; ++sampleIndex) {
           traceSample(sampleIndex);
@@ -171,11 +206,11 @@ void Renderer::render(AsciiFramebuffer& framebuffer, const Camera& camera, const
       }
 
       if (usedAdaptiveSampling) {
-        ++metrics_.adaptiveCells;
+        ++result.metrics.adaptiveCells;
       }
 
-      totalSamplesUsed += static_cast<std::uint64_t>(sampleCount);
-      metrics_.maxSamplesUsed = std::max(metrics_.maxSamplesUsed, sampleCount);
+      result.totalSamplesUsed += static_cast<std::uint64_t>(sampleCount);
+      result.metrics.maxSamplesUsed = std::max(result.metrics.maxSamplesUsed, sampleCount);
 
       const float inverseSampleCount = 1.0F / static_cast<float>(sampleCount);
       const Vec3 averageRadiance = radianceSum * inverseSampleCount;
@@ -186,20 +221,133 @@ void Renderer::render(AsciiFramebuffer& framebuffer, const Camera& camera, const
                               : std::numeric_limits<float>::infinity();
 
       AsciiCell& cell = framebuffer.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
-      cell.radiance = averageRadiance;
-      cell.luminance = averageLuminance;
-      cell.glyph = mapper.mapLuminanceToGlyph(averageLuminance, activeSettings.glyphRampMode);
-      cell.fg = averageDisplay;
-      cell.bg = Vec3{};
-      cell.depth = depth;
-      cell.sampleCount = sampleCount;
+
+      if (temporalOn) {
+        if (accumulationDirty) {
+          cell.accumulatedRadiance = averageRadiance;
+          cell.accumulatedFrames = 1;
+        } else {
+          cell.accumulatedRadiance += averageRadiance;
+          ++cell.accumulatedFrames;
+        }
+
+        const float invFrames = 1.0F / static_cast<float>(cell.accumulatedFrames);
+        const Vec3 outputRadiance = cell.accumulatedRadiance * invFrames;
+        const Vec3 outputDisplay = mapper.applyExposureGamma(outputRadiance, settings.exposure, settings.gamma);
+        const float outputLuminance = mapper.radianceToLuminance(outputDisplay);
+
+        cell.radiance = outputRadiance;
+        cell.luminance = outputLuminance;
+        cell.glyph = mapper.mapLuminanceToGlyph(outputLuminance, settings.glyphRampMode);
+        cell.fg = settings.colorOutput ? outputDisplay : Vec3{outputLuminance, outputLuminance, outputLuminance};
+        cell.bg = Vec3{};
+        cell.depth = depth;
+        cell.sampleCount = sampleCount;
+        cell.accumulatedLuminance = outputLuminance;
+        result.maxAccumulatedFrames = std::max(result.maxAccumulatedFrames, cell.accumulatedFrames);
+      } else {
+        cell.radiance = averageRadiance;
+        cell.luminance = averageLuminance;
+        cell.glyph = mapper.mapLuminanceToGlyph(averageLuminance, settings.glyphRampMode);
+        cell.fg = averageDisplay;
+        cell.bg = Vec3{};
+        cell.depth = depth;
+        cell.sampleCount = sampleCount;
+        cell.accumulatedRadiance = Vec3{};
+        cell.accumulatedLuminance = 0.0F;
+        cell.accumulatedFrames = 0;
+      }
     }
+  }
+}
+
+void Renderer::render(
+    AsciiFramebuffer& framebuffer,
+    const Camera& camera,
+    const Scene& scene,
+    const RenderSettings& settings) const
+{
+  RenderSettings activeSettings = settings;
+  activeSettings.validate();
+
+  const CameraState cameraState = camera.state();
+  accumulationDirty_ = !hasAppliedSettings_ ||
+                       activeSettings.accumulationDirty ||
+                       requiresAccumulationReset(activeSettings, appliedSettings_) ||
+                       requiresAccumulationReset(cameraState, appliedCameraState_);
+  appliedSettings_ = activeSettings;
+  appliedCameraState_ = cameraState;
+  hasAppliedSettings_ = true;
+
+  const int targetWidth = std::max(activeSettings.gridWidth, 1);
+  const int targetHeight = std::max(activeSettings.gridHeight, 1);
+  if (framebuffer.width() != static_cast<std::size_t>(targetWidth) ||
+      framebuffer.height() != static_cast<std::size_t>(targetHeight)) {
+    framebuffer.resize(static_cast<std::size_t>(targetWidth), static_cast<std::size_t>(targetHeight));
+    accumulationDirty_ = true;
+  }
+
+  const bool temporalOn = activeSettings.temporalAccumulation;
+  const bool accumulationValid = temporalOn && !accumulationDirty_;
+  if (!accumulationValid) {
+    framebuffer.clear();
+  }
+
+  metrics_ = RenderMetrics{};
+  metrics_.totalCells = static_cast<std::uint64_t>(targetWidth) * static_cast<std::uint64_t>(targetHeight);
+  metrics_.temporalAccumulation = temporalOn;
+
+  sceneTriangleCount_ = scene.triangles().size();
+  if (activeSettings.enableBvh) {
+    rayTracer_.buildAcceleration(scene.triangles(), activeSettings.bvhLeafSize);
+  }
+
+  int numThreads = activeSettings.enableMultithreading ? activeSettings.threadCount : 1;
+  if (numThreads <= 0) {
+    numThreads = static_cast<int>(std::thread::hardware_concurrency());
+    if (numThreads <= 0) {
+      numThreads = 1;
+    }
+  }
+  numThreads = std::min(numThreads, targetHeight);
+
+  std::vector<TileResult> results(static_cast<std::size_t>(numThreads));
+
+  if (numThreads == 1) {
+    renderTile(framebuffer, camera, scene, activeSettings, 0, targetHeight, accumulationDirty_, results[0]);
+  } else {
+    std::vector<std::thread> threads;
+    threads.reserve(static_cast<std::size_t>(numThreads));
+
+    for (int t = 0; t < numThreads; ++t) {
+      const int yStart = (t * targetHeight) / numThreads;
+      const int yEnd = ((t + 1) * targetHeight) / numThreads;
+      threads.emplace_back([this, &framebuffer, &camera, &scene, &activeSettings, yStart, yEnd, &results, t]() {
+        renderTile(framebuffer, camera, scene, activeSettings, yStart, yEnd, accumulationDirty_, results[t]);
+      });
+    }
+
+    for (auto& thread : threads) {
+      thread.join();
+    }
+  }
+
+  std::uint64_t totalSamplesUsed = 0;
+  int maxAccumulatedFrames = 0;
+
+  for (const auto& result : results) {
+    mergeMetrics(metrics_, result.metrics);
+    totalSamplesUsed += result.totalSamplesUsed;
+    maxAccumulatedFrames = std::max(maxAccumulatedFrames, result.maxAccumulatedFrames);
   }
 
   if (metrics_.totalCells > 0U) {
     metrics_.averageSamplesPerCell =
         static_cast<float>(static_cast<double>(totalSamplesUsed) / static_cast<double>(metrics_.totalCells));
   }
+  metrics_.accumulatedFrames = maxAccumulatedFrames;
+  metrics_.threadCountUsed = numThreads;
+  metrics_.enableMultithreading = activeSettings.enableMultithreading;
 }
 
 } // namespace astraglyph
