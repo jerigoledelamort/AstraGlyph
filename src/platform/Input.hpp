@@ -22,6 +22,7 @@ enum class Key : std::size_t {
   Digit3,
   Digit4,
   Digit5,
+  Digit6,
   LeftBracket,
   RightBracket,
   Minus,

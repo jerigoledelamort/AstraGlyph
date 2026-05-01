@@ -116,10 +116,8 @@ void parseRenderSettings(RenderSettings& settings, const json& obj)
   }
   if (obj.contains("glyphRampMode")) {
     const std::string mode = obj["glyphRampMode"].get<std::string>();
-    if (mode == "Dense") {
-      settings.glyphRampMode = GlyphRampMode::Dense;
-    } else if (mode == "Blocks") {
-      settings.glyphRampMode = GlyphRampMode::Blocks;
+    if (mode == "Filled") {
+      settings.glyphRampMode = GlyphRampMode::Filled;
     } else {
       settings.glyphRampMode = GlyphRampMode::Classic;
     }

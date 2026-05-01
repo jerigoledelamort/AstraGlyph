@@ -46,7 +46,8 @@ private:
       int cellHeight,
       char glyph,
       const Vec3& fgColor,
-      const Vec3& bgColor) const;
+      const Vec3& bgColor,
+      bool filled) const;
   void renderOverlayText(
       const std::vector<std::string>& lines,
       int originX,

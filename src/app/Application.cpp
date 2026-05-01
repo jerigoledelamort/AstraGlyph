@@ -152,10 +152,11 @@ void Application::render()
         const Vec3 fg = renderSettings_.colorOutput
                             ? cell.fg
                             : Vec3{cell.luminance, cell.luminance, cell.luminance};
+        const bool filled = renderSettings_.glyphRampMode == GlyphRampMode::Filled;
         renderCellToPixels(
             pixelData, pitch, windowWidth, windowHeight,
             x0, y0, cellWidth, cellHeight,
-            cell.glyph, fg, cell.bg);
+            cell.glyph, fg, cell.bg, filled);
       }
     }
 
@@ -214,6 +215,9 @@ void Application::handleRuntimeSettingsInput()
   }
   if (input_.wasKeyPressed(Key::Digit5)) {
     renderSettings_.toggleBvh();
+  }
+  if (input_.wasKeyPressed(Key::Digit6)) {
+    renderSettings_.cycleGlyphRampMode();
   }
   if (input_.wasKeyPressed(Key::T)) {
     renderSettings_.toggleTemporalAccumulation();
@@ -288,7 +292,8 @@ void Application::renderCellToPixels(
     int cellHeight,
     char glyph,
     const Vec3& fgColor,
-    const Vec3& bgColor) const
+    const Vec3& bgColor,
+    bool filled) const
 {
   (void)windowWidth;
   (void)windowHeight;
@@ -299,6 +304,15 @@ void Application::renderCellToPixels(
     p[2] = static_cast<std::uint8_t>(std::clamp(color.z, 0.0F, 1.0F) * 255.0F);
     p[3] = 255;
   };
+
+  if (filled) {
+    for (int row = y; row < y + cellHeight; ++row) {
+      for (int col = x; col < x + cellWidth; ++col) {
+        setPixel(col, row, fgColor);
+      }
+    }
+    return;
+  }
 
   for (int row = y; row < y + cellHeight; ++row) {
     for (int col = x; col < x + cellWidth; ++col) {

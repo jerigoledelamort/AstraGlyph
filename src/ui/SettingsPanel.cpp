@@ -84,7 +84,7 @@ std::vector<std::string> SettingsPanel::buildLines(const RenderSettings& setting
   lines.push_back("F1 DEBUG OVERLAY");
   lines.push_back("F2 SETTINGS PANEL");
   lines.push_back("1 SHADOWS  2 SOFT SHADOWS  3 REFLECTIONS");
-  lines.push_back("4 ADAPTIVE  5 BVH  T TEMPORAL");
+  lines.push_back("4 ADAPTIVE  5 BVH  6 FILL MODE  T TEMPORAL");
   lines.push_back("[ ] SAMPLES PER CELL");
   lines.push_back("- = SOFT SHADOW SAMPLES OR BOUNCES");
 

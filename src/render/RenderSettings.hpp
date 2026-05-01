@@ -10,8 +10,7 @@ namespace astraglyph {
 
 enum class GlyphRampMode : std::uint8_t {
   Classic = 0,
-  Dense,
-  Blocks,
+  Filled,
 };
 
 struct RenderSettings {
@@ -175,13 +174,19 @@ struct RenderSettings {
   [[nodiscard]] static std::string_view glyphRampModeName(GlyphRampMode mode) noexcept
   {
     switch (mode) {
-      case GlyphRampMode::Dense:
-        return "Dense";
-      case GlyphRampMode::Blocks:
-        return "Blocks";
+      case GlyphRampMode::Filled:
+        return "Filled";
       default:
         return "Classic";
     }
+  }
+
+  void cycleGlyphRampMode() noexcept
+  {
+    glyphRampMode = (glyphRampMode == GlyphRampMode::Classic)
+                        ? GlyphRampMode::Filled
+                        : GlyphRampMode::Classic;
+    markChanged(DirtyPresentation);
   }
 
 private:

@@ -9,16 +9,12 @@ namespace astraglyph {
 namespace {
 
 constexpr std::string_view kClassicRamp = "@#$S%?&*iI:-. ";
-constexpr std::string_view kDenseRamp = " `'.,:^~\";!i<>-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
-constexpr std::string_view kBlocksRamp = " .:=*#@";
 
 [[nodiscard]] std::string_view rampForMode(GlyphRampMode mode) noexcept
 {
   switch (mode) {
-    case GlyphRampMode::Dense:
-      return kDenseRamp;
-    case GlyphRampMode::Blocks:
-      return kBlocksRamp;
+    case GlyphRampMode::Filled:
+      return " ";
     default:
       return kClassicRamp;
   }

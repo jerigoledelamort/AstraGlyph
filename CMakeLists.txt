@@ -14,6 +14,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # Optimization flags for Release builds
 if(NOT MSVC)
   add_compile_options($<$<CONFIG:Release>:-O3>)
+  add_compile_options($<$<CONFIG:Release>:-mavx2>)
+  add_compile_options($<$<CONFIG:Release>:-mfma>)
 else()
   add_compile_options($<$<CONFIG:Release>:/O2 /fp:fast /arch:AVX2>)
 endif()

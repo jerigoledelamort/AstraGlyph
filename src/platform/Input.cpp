@@ -49,6 +49,9 @@ bool tryMapKey(SDL_Keycode keycode, Key& outKey) noexcept
   case SDLK_5:
     outKey = Key::Digit5;
     return true;
+  case SDLK_6:
+    outKey = Key::Digit6;
+    return true;
   case SDLK_LEFTBRACKET:
     outKey = Key::LeftBracket;
     return true;

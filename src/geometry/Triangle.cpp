@@ -28,8 +28,12 @@ bool Triangle::intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling)
 {
   constexpr float epsilon = 1.0e-6F;
 
-  const Vec3 pVec = cross(ray.direction, edge2);
-  const float determinant = dot(edge1, pVec);
+  // Compute edges if not cached (for backwards compatibility)
+  const Vec3 localEdge1 = edge1.lengthSquared() > epsilon ? edge1 : (v1 - v0);
+  const Vec3 localEdge2 = edge2.lengthSquared() > epsilon ? edge2 : (v2 - v0);
+
+  const Vec3 pVec = cross(ray.direction, localEdge2);
+  const float determinant = dot(localEdge1, pVec);
 
   if (backfaceCulling) {
     if (determinant <= epsilon) {
@@ -46,13 +50,13 @@ bool Triangle::intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling)
     return false;
   }
 
-  const Vec3 qVec = cross(tVec, edge1);
+  const Vec3 qVec = cross(tVec, localEdge1);
   const float v = dot(ray.direction, qVec) * invDet;
   if (v < 0.0F || (u + v) > 1.0F) {
     return false;
   }
 
-  const float t = dot(edge2, qVec) * invDet;
+  const float t = dot(localEdge2, qVec) * invDet;
   if (t < ray.tMin || t > ray.tMax) {
     return false;
   }
@@ -61,7 +65,7 @@ bool Triangle::intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling)
   const bool hasVertexNormals =
       lengthSquared(n0) > epsilon && lengthSquared(n1) > epsilon && lengthSquared(n2) > epsilon;
 
-  Vec3 shadingNormal = normalize(cross(edge1, edge2));
+  Vec3 shadingNormal = normalize(cross(localEdge1, localEdge2));
   if (hasVertexNormals) {
     shadingNormal = normalize(n0 * w + n1 * u + n2 * v);
   }
@@ -90,8 +94,12 @@ bool Triangle::intersectAny(const Ray& ray, bool backfaceCulling) const noexcept
 {
   constexpr float epsilon = 1.0e-6F;
 
-  const Vec3 pVec = cross(ray.direction, edge2);
-  const float determinant = dot(edge1, pVec);
+  // Compute edges if not cached (for backwards compatibility)
+  const Vec3 localEdge1 = edge1.lengthSquared() > epsilon ? edge1 : (v1 - v0);
+  const Vec3 localEdge2 = edge2.lengthSquared() > epsilon ? edge2 : (v2 - v0);
+
+  const Vec3 pVec = cross(ray.direction, localEdge2);
+  const float determinant = dot(localEdge1, pVec);
 
   if (backfaceCulling) {
     if (determinant <= epsilon) {
@@ -108,13 +116,13 @@ bool Triangle::intersectAny(const Ray& ray, bool backfaceCulling) const noexcept
     return false;
   }
 
-  const Vec3 qVec = cross(tVec, edge1);
+  const Vec3 qVec = cross(tVec, localEdge1);
   const float v = dot(ray.direction, qVec) * invDet;
   if (v < 0.0F || (u + v) > 1.0F) {
     return false;
   }
 
-  const float t = dot(edge2, qVec) * invDet;
+  const float t = dot(localEdge2, qVec) * invDet;
   return t >= ray.tMin && t <= ray.tMax;
 }
 
