@@ -15,6 +15,7 @@ struct CameraState {
   float aspect{16.0F / 9.0F};
 
   [[nodiscard]] bool operator==(const CameraState& other) const noexcept = default;
+  [[nodiscard]] bool operator!=(const CameraState& other) const noexcept = default;
 };
 
 class Camera {
@@ -36,6 +37,7 @@ public:
   [[nodiscard]] Vec3 getUp() const noexcept;
 
   void updateFromInput(const Input& input, float dt) noexcept;
+  void recomputeBasis() noexcept;
   [[nodiscard]] Ray generateRay(float u, float v) const noexcept;
   [[nodiscard]] Ray makeRay(Vec2 uv) const noexcept;
 
@@ -52,6 +54,11 @@ private:
   float mouseSensitivity_{0.0025F};
   float acceleration_{8.0F};
   float friction_{10.0F};
+
+  Vec3 forward_{};
+  Vec3 right_{};
+  Vec3 up_{};
+  float tanHalfFov_{};
 };
 
 } // namespace astraglyph

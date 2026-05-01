@@ -16,6 +16,7 @@ enum class Key : std::size_t {
   A,
   S,
   D,
+  T,
   Digit1,
   Digit2,
   Digit3,
@@ -41,19 +42,21 @@ enum class MouseButton : std::size_t {
 
 class Input {
 public:
-  void beginFrame() noexcept;
-  void pollEvents(Window& window);
+  virtual ~Input() = default;
+
+  virtual void beginFrame() noexcept;
+  virtual void pollEvents(Window& window);
   void processEvent(const ::SDL_Event& event, Window& window);
 
-  [[nodiscard]] bool isKeyDown(Key key) const noexcept;
-  [[nodiscard]] bool wasKeyPressed(Key key) const noexcept;
+  [[nodiscard]] virtual bool isKeyDown(Key key) const noexcept;
+  [[nodiscard]] virtual bool wasKeyPressed(Key key) const noexcept;
 
-  [[nodiscard]] bool isMouseButtonDown(MouseButton button) const noexcept;
-  [[nodiscard]] bool wasMouseButtonPressed(MouseButton button) const noexcept;
-  [[nodiscard]] bool wasMouseButtonReleased(MouseButton button) const noexcept;
+  [[nodiscard]] virtual bool isMouseButtonDown(MouseButton button) const noexcept;
+  [[nodiscard]] virtual bool wasMouseButtonPressed(MouseButton button) const noexcept;
+  [[nodiscard]] virtual bool wasMouseButtonReleased(MouseButton button) const noexcept;
 
-  [[nodiscard]] Vec2 mouseDelta() const noexcept;
-  [[nodiscard]] bool isMouseCaptured() const noexcept;
+  [[nodiscard]] virtual Vec2 mouseDelta() const noexcept;
+  [[nodiscard]] virtual bool isMouseCaptured() const noexcept;
 
 private:
   static constexpr std::size_t KeyCount = static_cast<std::size_t>(Key::Count);

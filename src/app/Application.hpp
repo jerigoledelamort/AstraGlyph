@@ -35,6 +35,18 @@ private:
       int cellHeight,
       const Vec3& fgColor,
       const Vec3& bgColor);
+  void renderCellToPixels(
+      std::uint8_t* pixels,
+      int pitch,
+      int windowWidth,
+      int windowHeight,
+      int x,
+      int y,
+      int cellWidth,
+      int cellHeight,
+      char glyph,
+      const Vec3& fgColor,
+      const Vec3& bgColor) const;
   void renderOverlayText(
       const std::vector<std::string>& lines,
       int originX,
@@ -53,6 +65,7 @@ private:
   AsciiFramebuffer framebuffer_{};
   Scene scene_{};
   std::string baseTitle_{};
+  int titleUpdateCounter_ = 0;
 };
 
 } // namespace astraglyph

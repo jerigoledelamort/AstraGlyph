@@ -8,6 +8,7 @@
 
 struct SDL_Window;
 struct SDL_Renderer;
+struct SDL_Texture;
 
 namespace astraglyph {
 
@@ -25,6 +26,8 @@ public:
   void requestClose() noexcept;
   void setTitle(std::string_view title);
   void beginFrame(const Vec3& clearColor) noexcept;
+  [[nodiscard]] bool lockFramePixels(int width, int height, void** pixels, int* pitch) noexcept;
+  void unlockFramePixels() noexcept;
   void drawFilledRect(int x, int y, int width, int height, const Vec3& color) noexcept;
   void present() noexcept;
 
@@ -42,6 +45,9 @@ private:
 
   SDL_Window* window_{nullptr};
   SDL_Renderer* renderer_{nullptr};
+  SDL_Texture* frameTexture_{nullptr};
+  int frameTextureWidth_{0};
+  int frameTextureHeight_{0};
   int width_{0};
   int height_{0};
   std::string title_{};

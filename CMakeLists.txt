@@ -11,6 +11,13 @@ option(ASTRAGLYPH_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# Optimization flags for Release builds
+if(NOT MSVC)
+  add_compile_options($<$<CONFIG:Release>:-O3>)
+else()
+  add_compile_options($<$<CONFIG:Release>:/O2 /fp:fast /arch:AVX2>)
+endif()
+
 include(ProjectOptions)
 include(CompilerWarnings)
 include(Dependencies)
@@ -25,6 +32,7 @@ set(ASTRAGLYPH_ENGINE_SOURCES
   src/platform/Input.cpp
   src/platform/Time.cpp
   src/core/Log.cpp
+  src/core/ThreadPool.cpp
   src/scene/Scene.cpp
   src/scene/SceneLoader.cpp
   src/scene/Camera.cpp

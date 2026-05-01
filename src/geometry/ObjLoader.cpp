@@ -225,6 +225,7 @@ struct FaceVertex {
   }
 
   triangle.materialId = materialId;
+  triangle.computeCachedEdges();
   return triangle;
 }
 

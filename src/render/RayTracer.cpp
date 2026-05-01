@@ -6,7 +6,15 @@ namespace astraglyph {
 
 void RayTracer::buildAcceleration(const std::vector<Triangle>& triangles, int leafSize)
 {
-  accelerationLeafSize_ = std::max(1, leafSize);
+  const int clampedLeafSize = std::max(1, leafSize);
+  if (accelerationReady_ &&
+      accelerationSource_ == triangles.data() &&
+      accelerationTriangleCount_ == triangles.size() &&
+      accelerationLeafSize_ == clampedLeafSize) {
+    return;
+  }
+
+  accelerationLeafSize_ = clampedLeafSize;
   accelerationSource_ = triangles.data();
   accelerationTriangleCount_ = triangles.size();
   accelerationReady_ = true;
@@ -53,6 +61,28 @@ HitInfo RayTracer::traceClosest(
   }
 
   return closest;
+}
+
+bool RayTracer::traceOcclusion(
+    const Ray& ray,
+    const std::vector<Triangle>& triangles,
+    const RenderSettings& settings,
+    RenderMetrics* metrics) const noexcept
+{
+  if (settings.enableBvh && canUseAcceleration(triangles, settings)) {
+    return bvh_.intersectAny(ray, ray.tMax, settings.backfaceCulling, metrics);
+  }
+
+  for (const Triangle& triangle : triangles) {
+    if (metrics != nullptr) {
+      ++metrics->triangleTests;
+    }
+    if (triangle.intersectAny(ray, settings.backfaceCulling)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 HitInfo RayTracer::traceClosestBruteForce(

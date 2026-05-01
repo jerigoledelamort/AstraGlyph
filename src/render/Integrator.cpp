@@ -70,8 +70,8 @@ bool traceShadowVisibility(
     const std::vector<Triangle>& triangles,
     const RenderSettings& settings,
     RenderMetrics& metrics,
-    Vec3 origin,
-    Vec3 direction,
+    const Vec3& origin,
+    const Vec3& direction,
     float tMax) noexcept
 {
   const float bias = safeShadowBias(settings);
@@ -82,7 +82,7 @@ bool traceShadowVisibility(
       bias,
       tMax,
   };
-  const bool occluded = rayTracer.traceClosest(shadowRay, triangles, settings, &metrics).hit;
+  const bool occluded = rayTracer.traceOcclusion(shadowRay, triangles, settings, &metrics);
   if (occluded) {
     ++metrics.occludedShadowRays;
   }
@@ -92,7 +92,7 @@ bool traceShadowVisibility(
 Vec3 accumulateAreaLight(
     const Light& light,
     const HitInfo& hit,
-    Vec3 normal,
+    const Vec3& normal,
     const Ray& ray,
     const std::vector<Triangle>& triangles,
     const RayTracer& rayTracer,

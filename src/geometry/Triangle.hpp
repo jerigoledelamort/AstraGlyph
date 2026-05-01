@@ -30,10 +30,17 @@ struct Triangle {
   Vec2 uv2{};
   int materialId{0};
 
+  // Cached edges for faster intersection
+  Vec3 edge1{}; // v1 - v0
+  Vec3 edge2{}; // v2 - v0
+
   [[nodiscard]] Aabb bounds() const noexcept;
   [[nodiscard]] Vec3 faceNormal() const noexcept;
   [[nodiscard]] bool intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling) const noexcept;
   [[nodiscard]] bool intersect(const Ray& ray, float& t) const noexcept;
+  [[nodiscard]] bool intersectAny(const Ray& ray, bool backfaceCulling) const noexcept;
+
+  void computeCachedEdges() noexcept;
 };
 
 } // namespace astraglyph

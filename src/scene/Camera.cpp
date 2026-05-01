@@ -50,17 +50,20 @@ void Camera::setPosition(Vec3 value) noexcept
 void Camera::setYaw(float value) noexcept
 {
   yaw_ = value;
+  recomputeBasis();
 }
 
 void Camera::setPitch(float value) noexcept
 {
   pitch_ = std::clamp(value, -kMaxPitch, kMaxPitch);
+  recomputeBasis();
 }
 
 void Camera::setFovY(float value) noexcept
 {
   if (value > 0.0F && value < 180.0F) {
     fovY_ = value * (3.14159265358979323846F / 180.0F);
+    recomputeBasis();
   }
 }
 
@@ -84,24 +87,36 @@ Vec3 Camera::getUp() const noexcept
   return normalize(cross(getRight(), getForward()));
 }
 
+void Camera::recomputeBasis() noexcept
+{
+  const float cosPitch = std::cos(pitch_);
+  forward_ = normalize(Vec3{
+      std::cos(yaw_) * cosPitch,
+      std::sin(pitch_),
+      std::sin(yaw_) * cosPitch,
+  });
+  right_ = normalize(cross(forward_, Vec3{0.0F, 1.0F, 0.0F}));
+  up_ = normalize(cross(right_, forward_));
+  tanHalfFov_ = std::tan(fovY_ * 0.5F);
+}
+
 void Camera::updateFromInput(const Input& input, float dt) noexcept
 {
-  const Vec3 forward = getForward();
-  const Vec3 right = getRight();
+  recomputeBasis();
   const Vec3 worldUp{0.0F, 1.0F, 0.0F};
 
   Vec3 targetVelocity{};
   if (input.isKeyDown(Key::W)) {
-    targetVelocity += forward;
+    targetVelocity += forward_;
   }
   if (input.isKeyDown(Key::S)) {
-    targetVelocity -= forward;
+    targetVelocity -= forward_;
   }
   if (input.isKeyDown(Key::D)) {
-    targetVelocity += right;
+    targetVelocity += right_;
   }
   if (input.isKeyDown(Key::A)) {
-    targetVelocity -= right;
+    targetVelocity -= right_;
   }
   if (input.isKeyDown(Key::LeftShift)) {
     targetVelocity += worldUp;
@@ -137,20 +152,15 @@ void Camera::updateFromInput(const Input& input, float dt) noexcept
     yaw_ += delta.x * mouseSensitivity_;
     pitch_ -= delta.y * mouseSensitivity_;
     pitch_ = std::clamp(pitch_, -kMaxPitch, kMaxPitch);
+    recomputeBasis();
   }
 }
 
 Ray Camera::generateRay(float u, float v) const noexcept
 {
-  const float tanHalfFov = std::tan(fovY_ * 0.5F);
-  const float screenX = (2.0F * u - 1.0F) * aspect_ * tanHalfFov;
-  const float screenY = (1.0F - 2.0F * v) * tanHalfFov;
-
-  const Vec3 forward = getForward();
-  const Vec3 right = getRight();
-  const Vec3 up = getUp();
-  const Vec3 direction = normalize(forward + right * screenX + up * screenY);
-
+  const float screenX = (2.0F * u - 1.0F) * aspect_ * tanHalfFov_;
+  const float screenY = (1.0F - 2.0F * v) * tanHalfFov_;
+  const Vec3 direction = normalize(forward_ + right_ * screenX + up_ * screenY);
   return Ray{position_, direction};
 }
 

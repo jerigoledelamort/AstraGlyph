@@ -15,16 +15,24 @@ bool tryMapKey(SDL_Keycode keycode, Key& outKey) noexcept
 {
   switch (keycode) {
   case SDLK_W:
+  case 'W':
     outKey = Key::W;
     return true;
   case SDLK_A:
+  case 'A':
     outKey = Key::A;
     return true;
   case SDLK_S:
+  case 'S':
     outKey = Key::S;
     return true;
   case SDLK_D:
+  case 'D':
     outKey = Key::D;
+    return true;
+  case SDLK_T:
+  case 'T':
+    outKey = Key::T;
     return true;
   case SDLK_1:
     outKey = Key::Digit1;

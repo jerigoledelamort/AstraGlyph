@@ -120,6 +120,12 @@ struct RenderSettings {
     markChanged(DirtyAccumulation);
   }
 
+  void toggleTemporalAccumulation() noexcept
+  {
+    temporalAccumulation = !temporalAccumulation;
+    markChanged(DirtyAccumulation);
+  }
+
   void toggleBvh() noexcept
   {
     enableBvh = !enableBvh;

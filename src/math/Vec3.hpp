@@ -78,6 +78,9 @@ struct Vec3 {
     return *this;
   }
 
+  [[nodiscard]] constexpr bool operator==(const Vec3& rhs) const noexcept = default;
+  [[nodiscard]] constexpr bool operator!=(const Vec3& rhs) const noexcept = default;
+
   [[nodiscard]] constexpr float lengthSquared() const noexcept
   {
     return x * x + y * y + z * z;

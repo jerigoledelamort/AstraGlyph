@@ -4,6 +4,12 @@
 
 namespace astraglyph {
 
+void Triangle::computeCachedEdges() noexcept
+{
+  edge1 = v1 - v0;
+  edge2 = v2 - v0;
+}
+
 Aabb Triangle::bounds() const noexcept
 {
   Aabb result;
@@ -22,8 +28,6 @@ bool Triangle::intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling)
 {
   constexpr float epsilon = 1.0e-6F;
 
-  const Vec3 edge1 = v1 - v0;
-  const Vec3 edge2 = v2 - v0;
   const Vec3 pVec = cross(ray.direction, edge2);
   const float determinant = dot(edge1, pVec);
 
@@ -57,7 +61,7 @@ bool Triangle::intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling)
   const bool hasVertexNormals =
       lengthSquared(n0) > epsilon && lengthSquared(n1) > epsilon && lengthSquared(n2) > epsilon;
 
-  Vec3 shadingNormal = faceNormal();
+  Vec3 shadingNormal = normalize(cross(edge1, edge2));
   if (hasVertexNormals) {
     shadingNormal = normalize(n0 * w + n1 * u + n2 * v);
   }
@@ -80,6 +84,38 @@ bool Triangle::intersect(const Ray& ray, float& t) const noexcept
 
   t = hitInfo.t;
   return true;
+}
+
+bool Triangle::intersectAny(const Ray& ray, bool backfaceCulling) const noexcept
+{
+  constexpr float epsilon = 1.0e-6F;
+
+  const Vec3 pVec = cross(ray.direction, edge2);
+  const float determinant = dot(edge1, pVec);
+
+  if (backfaceCulling) {
+    if (determinant <= epsilon) {
+      return false;
+    }
+  } else if (std::fabs(determinant) <= epsilon) {
+    return false;
+  }
+
+  const float invDet = 1.0F / determinant;
+  const Vec3 tVec = ray.origin - v0;
+  const float u = dot(tVec, pVec) * invDet;
+  if (u < 0.0F || u > 1.0F) {
+    return false;
+  }
+
+  const Vec3 qVec = cross(tVec, edge1);
+  const float v = dot(ray.direction, qVec) * invDet;
+  if (v < 0.0F || (u + v) > 1.0F) {
+    return false;
+  }
+
+  const float t = dot(edge2, qVec) * invDet;
+  return t >= ray.tMin && t <= ray.tMax;
 }
 
 } // namespace astraglyph

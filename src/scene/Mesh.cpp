@@ -50,6 +50,7 @@ void Mesh::translate(Vec3 offset) noexcept
     triangle.v0 += offset;
     triangle.v1 += offset;
     triangle.v2 += offset;
+    triangle.computeCachedEdges();
   }
   recomputeBounds();
 }
@@ -60,6 +61,7 @@ void Mesh::scale(Vec3 factor) noexcept
     triangle.v0.x *= factor.x; triangle.v0.y *= factor.y; triangle.v0.z *= factor.z;
     triangle.v1.x *= factor.x; triangle.v1.y *= factor.y; triangle.v1.z *= factor.z;
     triangle.v2.x *= factor.x; triangle.v2.y *= factor.y; triangle.v2.z *= factor.z;
+    triangle.computeCachedEdges();
   }
   recomputeBounds();
 }
@@ -73,6 +75,7 @@ void Mesh::rotate(float yaw, float pitch, float roll) noexcept
     triangle.n0 = normalize(rotatePoint(triangle.n0, yaw, pitch, roll));
     triangle.n1 = normalize(rotatePoint(triangle.n1, yaw, pitch, roll));
     triangle.n2 = normalize(rotatePoint(triangle.n2, yaw, pitch, roll));
+    triangle.computeCachedEdges();
   }
   recomputeBounds();
 }

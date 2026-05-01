@@ -12,7 +12,9 @@ constexpr float kPi = 3.14159265358979323846F;
 
 Triangle makeMeshTriangle(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 n0, Vec3 n1, Vec3 n2, int materialId)
 {
-  return Triangle{v0, v1, v2, n0, n1, n2, Vec2{}, Vec2{}, Vec2{}, materialId};
+  Triangle triangle{v0, v1, v2, n0, n1, n2, Vec2{}, Vec2{}, Vec2{}, materialId};
+  triangle.computeCachedEdges();
+  return triangle;
 }
 
 void addQuad(Mesh& mesh, Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 normal)
@@ -53,8 +55,12 @@ Mesh MeshFactory::createPlane(float width, float depth, int materialId)
   const Vec3 d{-halfWidth, 0.0F, halfDepth};
 
   Mesh mesh{materialId};
-  mesh.addTriangle(Triangle{a, c, b, normal, normal, normal, Vec2{0.0F, 0.0F}, Vec2{1.0F, 1.0F}, Vec2{1.0F, 0.0F}, materialId});
-  mesh.addTriangle(Triangle{a, d, c, normal, normal, normal, Vec2{0.0F, 0.0F}, Vec2{0.0F, 1.0F}, Vec2{1.0F, 1.0F}, materialId});
+  Triangle t1{a, c, b, normal, normal, normal, Vec2{0.0F, 0.0F}, Vec2{1.0F, 1.0F}, Vec2{1.0F, 0.0F}, materialId};
+  t1.computeCachedEdges();
+  mesh.addTriangle(t1);
+  Triangle t2{a, d, c, normal, normal, normal, Vec2{0.0F, 0.0F}, Vec2{0.0F, 1.0F}, Vec2{1.0F, 1.0F}, materialId};
+  t2.computeCachedEdges();
+  mesh.addTriangle(t2);
   return mesh;
 }
 

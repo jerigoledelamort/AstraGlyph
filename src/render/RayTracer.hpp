@@ -25,6 +25,12 @@ public:
       const RenderSettings& settings,
       RenderMetrics* metrics) const noexcept;
 
+  [[nodiscard]] bool traceOcclusion(
+      const Ray& ray,
+      const std::vector<Triangle>& triangles,
+      const RenderSettings& settings,
+      RenderMetrics* metrics = nullptr) const noexcept;
+
 private:
   [[nodiscard]] HitInfo traceClosestBruteForce(
       const Ray& ray,

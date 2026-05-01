@@ -1,11 +1,15 @@
 #pragma once
 
+#include "core/ThreadPool.hpp"
 #include "render/AsciiFramebuffer.hpp"
 #include "render/Integrator.hpp"
 #include "render/RayTracer.hpp"
 #include "render/RenderSettings.hpp"
 #include "scene/Camera.hpp"
 #include "scene/Scene.hpp"
+
+#include <cstddef>
+#include <vector>
 
 namespace astraglyph {
 
@@ -17,11 +21,13 @@ struct TileResult {
 
 class Renderer {
 public:
+  Renderer() = default;
+
   void render(
       AsciiFramebuffer& framebuffer,
       const Camera& camera,
       const Scene& scene,
-      const RenderSettings& settings) const;
+      const RenderSettings& settings);
   [[nodiscard]] const RenderMetrics& metrics() const noexcept;
   [[nodiscard]] bool accumulationDirty() const noexcept;
   [[nodiscard]] std::size_t sceneTriangleCount() const noexcept;
@@ -42,20 +48,21 @@ private:
       int yStart,
       int yEnd,
       bool accumulationDirty,
-      TileResult& result) const;
+      TileResult& result);
 
   static void mergeMetrics(
       RenderMetrics& dest,
       const RenderMetrics& src);
 
-  mutable RayTracer rayTracer_{};
+  RayTracer rayTracer_{};
   Integrator integrator_{};
-  mutable RenderMetrics metrics_{};
-  mutable RenderSettings appliedSettings_{};
-  mutable CameraState appliedCameraState_{};
-  mutable bool hasAppliedSettings_{false};
-  mutable bool accumulationDirty_{true};
-  mutable std::size_t sceneTriangleCount_{0};
+  ThreadPool threadPool_{};
+  RenderMetrics metrics_{};
+  RenderSettings appliedSettings_{};
+  CameraState appliedCameraState_{};
+  bool hasAppliedSettings_{false};
+  bool accumulationDirty_{true};
+  std::size_t sceneTriangleCount_{0};
 };
 
 } // namespace astraglyph

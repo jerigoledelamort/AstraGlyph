@@ -32,9 +32,16 @@ public:
       HitInfo& hitInfo,
       bool backfaceCulling,
       RenderMetrics* metrics = nullptr) const noexcept;
+  [[nodiscard]] bool intersectAny(
+      const Ray& ray,
+      float tMax,
+      bool backfaceCulling,
+      RenderMetrics* metrics = nullptr) const noexcept;
   [[nodiscard]] std::size_t nodeCount() const noexcept;
   [[nodiscard]] std::size_t leafCount() const noexcept;
   [[nodiscard]] std::size_t triangleCount() const noexcept;
+
+  [[nodiscard]] static float axisComponent(const Vec3& value, int axis) noexcept;
 
 private:
   int buildNode(int firstTriangle, int triangleCount);
@@ -47,7 +54,12 @@ private:
       float& closestT,
       HitInfo& closestHit,
       RenderMetrics* metrics) const noexcept;
-  [[nodiscard]] static float axisComponent(const Vec3& value, int axis) noexcept;
+  [[nodiscard]] bool intersectAnyNode(
+      int nodeIndex,
+      const Ray& ray,
+      float tMax,
+      bool backfaceCulling,
+      RenderMetrics* metrics) const noexcept;
 
   std::vector<BvhNode> nodes_{};
   std::vector<Triangle> triangles_{};

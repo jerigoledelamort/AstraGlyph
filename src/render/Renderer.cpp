@@ -6,8 +6,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <future>
 #include <limits>
-#include <thread>
 #include <vector>
 
 namespace astraglyph {
@@ -144,7 +144,7 @@ void Renderer::renderTile(
     int yStart,
     int yEnd,
     bool accumulationDirty,
-    TileResult& result) const
+    TileResult& result)
 {
   const int targetWidth = settings.gridWidth;
   const bool temporalOn = settings.temporalAccumulation;
@@ -265,7 +265,7 @@ void Renderer::render(
     AsciiFramebuffer& framebuffer,
     const Camera& camera,
     const Scene& scene,
-    const RenderSettings& settings) const
+    const RenderSettings& settings)
 {
   RenderSettings activeSettings = settings;
   activeSettings.validate();
@@ -316,19 +316,18 @@ void Renderer::render(
   if (numThreads == 1) {
     renderTile(framebuffer, camera, scene, activeSettings, 0, targetHeight, accumulationDirty_, results[0]);
   } else {
-    std::vector<std::thread> threads;
-    threads.reserve(static_cast<std::size_t>(numThreads));
-
+    std::vector<std::future<void>> futures;
+    futures.reserve(static_cast<std::size_t>(numThreads));
     for (int t = 0; t < numThreads; ++t) {
       const int yStart = (t * targetHeight) / numThreads;
       const int yEnd = ((t + 1) * targetHeight) / numThreads;
-      threads.emplace_back([this, &framebuffer, &camera, &scene, &activeSettings, yStart, yEnd, &results, t]() {
-        renderTile(framebuffer, camera, scene, activeSettings, yStart, yEnd, accumulationDirty_, results[t]);
-      });
+      futures.push_back(std::async(std::launch::async,
+        [this, &framebuffer, &camera, &scene, &activeSettings, &results, t, yStart, yEnd]() {
+          renderTile(framebuffer, camera, scene, activeSettings, yStart, yEnd, this->accumulationDirty_, results[static_cast<std::size_t>(t)]);
+        }));
     }
-
-    for (auto& thread : threads) {
-      thread.join();
+    for (auto& f : futures) {
+      f.get();
     }
   }
 

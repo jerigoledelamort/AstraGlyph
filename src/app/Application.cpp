@@ -101,7 +101,10 @@ int Application::run()
     input_.pollEvents(window_);
     update(static_cast<float>(time_.deltaTime()));
     render();
-    updateWindowTitle();
+    if (++titleUpdateCounter_ >= 6) {
+      titleUpdateCounter_ = 0;
+      updateWindowTitle();
+    }
   }
 
   return 0;
@@ -128,20 +131,35 @@ void Application::render()
 
   window_.beginFrame(Vec3{0.02F, 0.02F, 0.03F});
 
-  for (int y = 0; y < gridHeight; ++y) {
-    const int y0 = (y * windowHeight) / gridHeight;
-    const int y1 = ((y + 1) * windowHeight) / gridHeight;
-    const int cellHeight = std::max(1, y1 - y0);
+  void* pixels = nullptr;
+  int pitch = 0;
+  const bool pixelBufferReady = window_.lockFramePixels(windowWidth, windowHeight, &pixels, &pitch);
 
-    for (int x = 0; x < gridWidth; ++x) {
-      const int x0 = (x * windowWidth) / gridWidth;
-      const int x1 = ((x + 1) * windowWidth) / gridWidth;
-      const int cellWidth = std::max(1, x1 - x0);
+  if (pixelBufferReady) {
+    auto* pixelData = static_cast<std::uint8_t*>(pixels);
 
-      const AsciiCell& cell = framebuffer_.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
-      Vec3 fg = renderSettings_.colorOutput ? cell.fg : Vec3{cell.luminance, cell.luminance, cell.luminance};
-      renderGlyph(cell.glyph, x0, y0, cellWidth, cellHeight, fg, cell.bg);
+    for (int y = 0; y < gridHeight; ++y) {
+      const int y0 = (y * windowHeight) / gridHeight;
+      const int y1 = ((y + 1) * windowHeight) / gridHeight;
+      const int cellHeight = std::max(1, y1 - y0);
+
+      for (int x = 0; x < gridWidth; ++x) {
+        const int x0 = (x * windowWidth) / gridWidth;
+        const int x1 = ((x + 1) * windowWidth) / gridWidth;
+        const int cellWidth = std::max(1, x1 - x0);
+
+        const AsciiCell& cell = framebuffer_.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
+        const Vec3 fg = renderSettings_.colorOutput
+                            ? cell.fg
+                            : Vec3{cell.luminance, cell.luminance, cell.luminance};
+        renderCellToPixels(
+            pixelData, pitch, windowWidth, windowHeight,
+            x0, y0, cellWidth, cellHeight,
+            cell.glyph, fg, cell.bg);
+      }
     }
+
+    window_.unlockFramePixels();
   }
 
   const std::vector<std::string> debugLines = debugOverlay_.buildLines(
@@ -196,6 +214,9 @@ void Application::handleRuntimeSettingsInput()
   }
   if (input_.wasKeyPressed(Key::Digit5)) {
     renderSettings_.toggleBvh();
+  }
+  if (input_.wasKeyPressed(Key::T)) {
+    renderSettings_.toggleTemporalAccumulation();
   }
   if (input_.wasKeyPressed(Key::LeftBracket)) {
     renderSettings_.adjustSamplesPerCell(-1);
@@ -252,6 +273,70 @@ void Application::renderGlyph(
           scale,
           scale,
           fgColor);
+    }
+  }
+}
+
+void Application::renderCellToPixels(
+    std::uint8_t* pixels,
+    int pitch,
+    int windowWidth,
+    int windowHeight,
+    int x,
+    int y,
+    int cellWidth,
+    int cellHeight,
+    char glyph,
+    const Vec3& fgColor,
+    const Vec3& bgColor) const
+{
+  (void)windowWidth;
+  (void)windowHeight;
+  const auto setPixel = [&](int px, int py, const Vec3& color) {
+    std::uint8_t* p = pixels + py * pitch + px * 4;
+    p[0] = static_cast<std::uint8_t>(std::clamp(color.x, 0.0F, 1.0F) * 255.0F);
+    p[1] = static_cast<std::uint8_t>(std::clamp(color.y, 0.0F, 1.0F) * 255.0F);
+    p[2] = static_cast<std::uint8_t>(std::clamp(color.z, 0.0F, 1.0F) * 255.0F);
+    p[3] = 255;
+  };
+
+  for (int row = y; row < y + cellHeight; ++row) {
+    for (int col = x; col < x + cellWidth; ++col) {
+      setPixel(col, row, bgColor);
+    }
+  }
+
+  if (glyph == ' ') {
+    return;
+  }
+
+  const int scale = std::min(cellWidth / kGlyphPixelWidth, cellHeight / kGlyphPixelHeight);
+  if (scale <= 0) {
+    for (int row = y; row < y + cellHeight; ++row) {
+      for (int col = x; col < x + cellWidth; ++col) {
+        setPixel(col, row, fgColor);
+      }
+    }
+    return;
+  }
+
+  const char character = static_cast<char>(std::toupper(static_cast<unsigned char>(glyph)));
+  const auto pattern = glyphPattern(character);
+  const int drawWidth = kGlyphPixelWidth * scale;
+  const int drawHeight = kGlyphPixelHeight * scale;
+  const int offsetX = x + (cellWidth - drawWidth) / 2;
+  const int offsetY = y + (cellHeight - drawHeight) / 2;
+
+  for (int row = 0; row < kGlyphPixelHeight; ++row) {
+    for (int column = 0; column < kGlyphPixelWidth; ++column) {
+      if (pattern[static_cast<std::size_t>(row)][static_cast<std::size_t>(column)] != '1') {
+        continue;
+      }
+      for (int sy = 0; sy < scale; ++sy) {
+        for (int sx = 0; sx < scale; ++sx) {
+          setPixel(offsetX + column * scale + sx, offsetY + row * scale + sy, fgColor);
+        }
+      }
     }
   }
 }

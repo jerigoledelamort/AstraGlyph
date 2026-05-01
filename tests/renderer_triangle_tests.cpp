@@ -25,7 +25,7 @@ int main()
 
   const Scene scene = Scene::createDefaultScene();
   AsciiFramebuffer framebuffer;
-  const Renderer renderer;
+  Renderer renderer;
   renderer.render(framebuffer, camera, scene, settings);
 
   std::size_t visibleCells = 0;

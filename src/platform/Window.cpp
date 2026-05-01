@@ -75,6 +75,9 @@ Window::~Window()
 Window::Window(Window&& other) noexcept
     : window_{other.window_},
       renderer_{other.renderer_},
+      frameTexture_{other.frameTexture_},
+      frameTextureWidth_{other.frameTextureWidth_},
+      frameTextureHeight_{other.frameTextureHeight_},
       width_{other.width_},
       height_{other.height_},
       title_{std::move(other.title_)},
@@ -83,6 +86,9 @@ Window::Window(Window&& other) noexcept
 {
   other.window_ = nullptr;
   other.renderer_ = nullptr;
+  other.frameTexture_ = nullptr;
+  other.frameTextureWidth_ = 0;
+  other.frameTextureHeight_ = 0;
   other.width_ = 0;
   other.height_ = 0;
   other.closeRequested_ = true;
@@ -99,6 +105,9 @@ Window& Window::operator=(Window&& other) noexcept
 
   window_ = other.window_;
   renderer_ = other.renderer_;
+  frameTexture_ = other.frameTexture_;
+  frameTextureWidth_ = other.frameTextureWidth_;
+  frameTextureHeight_ = other.frameTextureHeight_;
   width_ = other.width_;
   height_ = other.height_;
   title_ = std::move(other.title_);
@@ -107,6 +116,9 @@ Window& Window::operator=(Window&& other) noexcept
 
   other.window_ = nullptr;
   other.renderer_ = nullptr;
+  other.frameTexture_ = nullptr;
+  other.frameTextureWidth_ = 0;
+  other.frameTextureHeight_ = 0;
   other.width_ = 0;
   other.height_ = 0;
   other.closeRequested_ = true;
@@ -145,6 +157,39 @@ void Window::beginFrame(const Vec3& clearColor) noexcept
 
   SDL_SetRenderDrawColor(renderer_, toColor(clearColor.x), toColor(clearColor.y), toColor(clearColor.z), 255U);
   SDL_RenderClear(renderer_);
+}
+
+bool Window::lockFramePixels(int width, int height, void** pixels, int* pitch) noexcept
+{
+  if (renderer_ == nullptr || width <= 0 || height <= 0) {
+    return false;
+  }
+
+  if (frameTexture_ == nullptr || frameTextureWidth_ != width || frameTextureHeight_ != height) {
+    if (frameTexture_ != nullptr) {
+      SDL_DestroyTexture(frameTexture_);
+      frameTexture_ = nullptr;
+    }
+    frameTexture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+    frameTextureWidth_ = width;
+    frameTextureHeight_ = height;
+  }
+
+  if (frameTexture_ == nullptr) {
+    return false;
+  }
+
+  return SDL_LockTexture(frameTexture_, nullptr, pixels, pitch);
+}
+
+void Window::unlockFramePixels() noexcept
+{
+  if (frameTexture_ == nullptr || renderer_ == nullptr) {
+    return;
+  }
+
+  SDL_UnlockTexture(frameTexture_);
+  SDL_RenderTexture(renderer_, frameTexture_, nullptr, nullptr);
 }
 
 void Window::drawFilledRect(int x, int y, int width, int height, const Vec3& color) noexcept
@@ -210,6 +255,12 @@ std::uint32_t Window::windowId() const noexcept
 
 void Window::destroy() noexcept
 {
+  if (frameTexture_ != nullptr) {
+    SDL_DestroyTexture(frameTexture_);
+    frameTexture_ = nullptr;
+    frameTextureWidth_ = 0;
+    frameTextureHeight_ = 0;
+  }
   if (renderer_ != nullptr) {
     SDL_DestroyRenderer(renderer_);
     renderer_ = nullptr;

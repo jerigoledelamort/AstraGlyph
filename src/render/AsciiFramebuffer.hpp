@@ -56,14 +56,14 @@ public:
     return height_;
   }
 
-  [[nodiscard]] AsciiCell& at(std::size_t x, std::size_t y)
+  [[nodiscard]] AsciiCell& at(std::size_t x, std::size_t y) noexcept
   {
-    return cells_.at(y * width_ + x);
+    return cells_[y * width_ + x];
   }
 
-  [[nodiscard]] const AsciiCell& at(std::size_t x, std::size_t y) const
+  [[nodiscard]] const AsciiCell& at(std::size_t x, std::size_t y) const noexcept
   {
-    return cells_.at(y * width_ + x);
+    return cells_[y * width_ + x];
   }
 
   [[nodiscard]] std::vector<AsciiCell>& data() noexcept
