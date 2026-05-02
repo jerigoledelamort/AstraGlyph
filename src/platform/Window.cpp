@@ -170,7 +170,7 @@ bool Window::lockFramePixels(int width, int height, void** pixels, int* pitch) n
       SDL_DestroyTexture(frameTexture_);
       frameTexture_ = nullptr;
     }
-    frameTexture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+    frameTexture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, width, height);
     frameTextureWidth_ = width;
     frameTextureHeight_ = height;
   }

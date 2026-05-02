@@ -84,7 +84,8 @@ constexpr int kLineSpacing = 2;
 Application::Application()
     : window_{1280, 720, "AstraGlyph / AsciiTracer"}, baseTitle_{"AstraGlyph / AsciiTracer"}
 {
-  const auto result = SceneLoader::loadFromFile("assets/scenes/default_scene.json");
+  // Load samurai_girl scene
+  const auto result = SceneLoader::loadFromFile("assets/scenes/samurai_girl_scene.json");
   scene_ = std::move(result.scene);
   camera_ = result.camera;
   renderSettings_ = result.renderSettings;
@@ -299,10 +300,10 @@ void Application::renderCellToPixels(
   (void)windowHeight;
   const auto setPixel = [&](int px, int py, const Vec3& color) {
     std::uint8_t* p = pixels + py * pitch + px * 4;
-    p[0] = static_cast<std::uint8_t>(std::clamp(color.x, 0.0F, 1.0F) * 255.0F);
-    p[1] = static_cast<std::uint8_t>(std::clamp(color.y, 0.0F, 1.0F) * 255.0F);
-    p[2] = static_cast<std::uint8_t>(std::clamp(color.z, 0.0F, 1.0F) * 255.0F);
-    p[3] = 255;
+    p[0] = static_cast<std::uint8_t>(std::clamp(color.z, 0.0F, 1.0F) * 255.0F);  // B
+    p[1] = static_cast<std::uint8_t>(std::clamp(color.y, 0.0F, 1.0F) * 255.0F);  // G
+    p[2] = static_cast<std::uint8_t>(std::clamp(color.x, 0.0F, 1.0F) * 255.0F);  // R
+    p[3] = 255;  // A
   };
 
   if (filled) {
