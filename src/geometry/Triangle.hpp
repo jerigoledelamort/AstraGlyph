@@ -15,6 +15,7 @@ struct HitInfo {
   Vec3 position{};
   Vec3 normal{};
   Vec3 barycentric{};
+  Vec2 uv{};
   int materialId{-1};
 };
 

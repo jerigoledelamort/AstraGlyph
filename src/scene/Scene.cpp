@@ -84,6 +84,11 @@ const std::vector<Material>& Scene::materials() const noexcept
   return materials_;
 }
 
+std::size_t Scene::getMaterialCount() const noexcept
+{
+  return materials_.size();
+}
+
 const std::vector<Light>& Scene::lights() const noexcept
 {
   return lights_;

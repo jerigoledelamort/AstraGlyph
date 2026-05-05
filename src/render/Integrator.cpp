@@ -1,6 +1,7 @@
 #include "render/Integrator.hpp"
 
 #include "render/Sampler.hpp"
+#include "scene/Material.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -168,8 +169,17 @@ Vec3 accumulateLocalLighting(
 {
   const Material& material = scene.materialFor(hit.materialId);
   const Vec3 normal = safeNormal(hit.normal);
+
+  // Sample textures if available
+  const Vec3 albedo = sampleAlbedoTextureLinear(material, hit.uv);
+  const float metallic = sampleMetallicTexture(material, hit.uv);
+  const float roughness = sampleRoughnessTexture(material, hit.uv);
+
   Vec3 result = material.emissionColor * material.emissionStrength;
-  result += material.albedo * settings.ambientStrength;
+  result += albedo * settings.ambientStrength;
+
+  // PBR: Metals have less diffuse reflection, rough surfaces scatter more light
+  const float diffuseStrength = (1.0F - metallic * 0.7F) * (0.5F + roughness * 0.5F);
 
   const std::vector<Triangle>& triangles = scene.triangles();
   for (const Light& light : scene.lights()) {
@@ -178,7 +188,7 @@ Vec3 accumulateLocalLighting(
     }
 
     if (light.type == LightType::Area) {
-      result += material.albedo * accumulateAreaLight(
+      result += albedo * diffuseStrength * accumulateAreaLight(
           light,
           hit,
           normal,
@@ -195,6 +205,7 @@ Vec3 accumulateLocalLighting(
     float lightTMax = std::numeric_limits<float>::infinity();
 
     if (light.type == LightType::Directional) {
+      // Normalize the light direction (light.direction points TOWARD light)
       lightDirection = safeNormal(-light.direction);
     } else {
       const Vec3 toLight = light.position - hit.position;
@@ -226,7 +237,7 @@ Vec3 accumulateLocalLighting(
     }
 
     if (visible) {
-      result += material.albedo * light.color * (ndotl * light.intensity);
+      result += albedo * diffuseStrength * light.color * (ndotl * light.intensity);
     }
   }
 
@@ -261,8 +272,19 @@ Vec3 Integrator::traceRadiance(
     return settings.backgroundColor;
   }
 
-  const Material& material = scene.materialFor(hit.materialId);
+const Material& material = scene.materialFor(hit.materialId);
   const Vec3 reflectionNormal = faceForwardNormal(hit.normal, ray.direction);
+
+  // DEBUG: Direct albedo texture output (bypass all lighting)
+  if (settings.debugAlbedoOnly) {
+    // Return sRGB albedo directly for visual comparison with original texture
+    return sampleAlbedoTexture(material, hit.uv);
+  }
+
+  // Sample PBR textures
+  const float metallic = sampleMetallicTexture(material, hit.uv);
+  const float roughness = sampleRoughnessTexture(material, hit.uv);
+
   const Vec3 localRadiance = accumulateLocalLighting(
       ray,
       hit,
@@ -272,9 +294,12 @@ Vec3 Integrator::traceRadiance(
       metrics,
       depth);
 
-  const float reflectivity = std::clamp(material.reflectivity, 0.0F, 1.0F);
+  // Calculate reflectivity based on metallic and roughness
+  // Higher metallic = more reflective, lower roughness = sharper reflections
+  const float reflectivity = std::clamp(metallic * (1.0F - roughness * 0.5F), 0.0F, 1.0F);
+
   const int maxBounces = std::max(settings.maxBounces, 0);
-  if (!settings.enableReflections || reflectivity <= 0.0F || depth >= maxBounces) {
+  if (!settings.enableReflections || reflectivity <= 0.01F || depth >= maxBounces) {
     return localRadiance;
   }
 
@@ -289,7 +314,11 @@ Vec3 Integrator::traceRadiance(
   };
   const Vec3 reflectedRadiance =
       traceRadiance(reflectedRay, scene, rayTracer, settings, metrics, nullptr, depth + 1);
-  return lerp(localRadiance, reflectedRadiance, reflectivity);
+
+  // Mix local radiance with reflection based on reflectivity
+  // Albedo affects reflection color for non-metallic surfaces
+  const Vec3 reflectionColor = lerp(Vec3{1.0F, 1.0F, 1.0F}, sampleAlbedoTextureLinear(material, hit.uv), 1.0F - metallic);
+  return lerp(localRadiance, reflectedRadiance * reflectionColor, reflectivity);
 }
 
 Vec3 Integrator::radiance(const Scene& scene, const Ray& ray) const

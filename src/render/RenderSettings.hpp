@@ -50,6 +50,9 @@ struct RenderSettings {
   float reflectionBias{0.001F};
   std::uint32_t frameIndex{0};
 
+  // Debug: output raw albedo texture (bypass lighting)
+  bool debugAlbedoOnly{false};
+
   std::uint64_t settingsVersion{0};
   std::uint32_t dirtyFlags{DirtyAccumulation | DirtyPresentation | DirtyAcceleration};
   bool accumulationDirty{true};
@@ -187,6 +190,12 @@ struct RenderSettings {
                         ? GlyphRampMode::Filled
                         : GlyphRampMode::Classic;
     markChanged(DirtyPresentation);
+  }
+
+  void toggleDebugAlbedoOnly() noexcept
+  {
+    debugAlbedoOnly = !debugAlbedoOnly;
+    markChanged(DirtyAccumulation);
   }
 
 private:

@@ -84,7 +84,7 @@ constexpr int kLineSpacing = 2;
 Application::Application()
     : window_{1280, 720, "AstraGlyph / AsciiTracer"}, baseTitle_{"AstraGlyph / AsciiTracer"}
 {
-  // Load samurai_girl scene
+  // Load samurai_girl scene (original with textures)
   const auto result = SceneLoader::loadFromFile("assets/scenes/samurai_girl_scene.json");
   scene_ = std::move(result.scene);
   camera_ = result.camera;
@@ -150,9 +150,7 @@ void Application::render()
         const int cellWidth = std::max(1, x1 - x0);
 
         const AsciiCell& cell = framebuffer_.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
-        const Vec3 fg = renderSettings_.colorOutput
-                            ? cell.fg
-                            : Vec3{cell.luminance, cell.luminance, cell.luminance};
+        const Vec3 fg = cell.fg;
         const bool filled = renderSettings_.glyphRampMode == GlyphRampMode::Filled;
         renderCellToPixels(
             pixelData, pitch, windowWidth, windowHeight,
@@ -222,6 +220,9 @@ void Application::handleRuntimeSettingsInput()
   }
   if (input_.wasKeyPressed(Key::T)) {
     renderSettings_.toggleTemporalAccumulation();
+  }
+  if (input_.wasKeyPressed(Key::Space)) {
+    renderSettings_.debugAlbedoOnly = !renderSettings_.debugAlbedoOnly;
   }
   if (input_.wasKeyPressed(Key::LeftBracket)) {
     renderSettings_.adjustSamplesPerCell(-1);
@@ -300,9 +301,9 @@ void Application::renderCellToPixels(
   (void)windowHeight;
   const auto setPixel = [&](int px, int py, const Vec3& color) {
     std::uint8_t* p = pixels + py * pitch + px * 4;
-    p[0] = static_cast<std::uint8_t>(std::clamp(color.z, 0.0F, 1.0F) * 255.0F);  // B
+    p[0] = static_cast<std::uint8_t>(std::clamp(color.x, 0.0F, 1.0F) * 255.0F);  // R
     p[1] = static_cast<std::uint8_t>(std::clamp(color.y, 0.0F, 1.0F) * 255.0F);  // G
-    p[2] = static_cast<std::uint8_t>(std::clamp(color.x, 0.0F, 1.0F) * 255.0F);  // R
+    p[2] = static_cast<std::uint8_t>(std::clamp(color.z, 0.0F, 1.0F) * 255.0F);  // B
     p[3] = 255;  // A
   };
 

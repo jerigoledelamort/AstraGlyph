@@ -176,11 +176,11 @@ void Renderer::renderTile(
         HitInfo hit{};
         const Vec3 radiance = integrator_.traceRadiance(ray, scene, rayTracer_, settings, result.metrics, &hit);
 
-        Vec3 display = mapper.applyExposureGamma(radiance, settings.exposure, settings.gamma);
+        // For debug albedo mode, bypass tone mapping and gamma
+        const Vec3 display = settings.debugAlbedoOnly 
+            ? radiance 
+            : mapper.applyExposureGamma(radiance, settings.exposure, settings.gamma);
         const float luminance = mapper.radianceToLuminance(display);
-        if (!settings.colorOutput) {
-          display = Vec3{luminance, luminance, luminance};
-        }
 
         radianceSum += radiance;
         displaySum += display;
@@ -233,22 +233,29 @@ void Renderer::renderTile(
 
         const float invFrames = 1.0F / static_cast<float>(cell.accumulatedFrames);
         const Vec3 outputRadiance = cell.accumulatedRadiance * invFrames;
-        const Vec3 outputDisplay = mapper.applyExposureGamma(outputRadiance, settings.exposure, settings.gamma);
+        const Vec3 outputDisplay = settings.debugAlbedoOnly
+            ? outputRadiance
+            : mapper.applyExposureGamma(outputRadiance, settings.exposure, settings.gamma);
         const float outputLuminance = mapper.radianceToLuminance(outputDisplay);
 
         cell.radiance = outputRadiance;
         cell.luminance = outputLuminance;
         cell.glyph = mapper.mapLuminanceToGlyph(outputLuminance, settings.glyphRampMode);
-        cell.fg = settings.colorOutput ? outputDisplay : Vec3{outputLuminance, outputLuminance, outputLuminance};
+        cell.fg = outputDisplay;
         cell.bg = Vec3{};
         cell.depth = depth;
         cell.sampleCount = sampleCount;
         cell.accumulatedLuminance = outputLuminance;
         result.maxAccumulatedFrames = std::max(result.maxAccumulatedFrames, cell.accumulatedFrames);
       } else {
+        const Vec3 displayForLuminance = settings.debugAlbedoOnly
+            ? averageRadiance
+            : mapper.applyExposureGamma(averageRadiance, settings.exposure, settings.gamma);
+        const float luminanceFromRadiance = mapper.radianceToLuminance(displayForLuminance);
+        
         cell.radiance = averageRadiance;
-        cell.luminance = averageLuminance;
-        cell.glyph = mapper.mapLuminanceToGlyph(averageLuminance, settings.glyphRampMode);
+        cell.luminance = luminanceFromRadiance;
+        cell.glyph = mapper.mapLuminanceToGlyph(luminanceFromRadiance, settings.glyphRampMode);
         cell.fg = averageDisplay;
         cell.bg = Vec3{};
         cell.depth = depth;

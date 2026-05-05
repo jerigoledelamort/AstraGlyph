@@ -1,0 +1,101 @@
+{
+  "camera": {
+    "position": [0.0, 1.5, 4.0],
+    "yaw": 0.0,
+    "pitch": -20.0,
+    "fov": 60.0
+  },
+  "renderSettings": {
+    "gridWidth": 160,
+    "gridHeight": 120,
+    "samplesPerCell": 4,
+    "maxSamplesPerCell": 256,
+    "jitteredSampling": true,
+    "adaptiveSampling": false,
+    "adaptiveVarianceThreshold": 0.01,
+    "temporalAccumulation": false,
+    "enableShadows": false,
+    "enableSoftShadows": false,
+    "shadowSamples": 1,
+    "enableReflections": false,
+    "maxBounces": 2,
+    "enableBvh": true,
+    "enableMultithreading": true,
+    "threadCount": 4,
+    "exposure": 2.0,
+    "gamma": 2.0,
+    "colorOutput": true,
+    "glyphRampMode": "Classic",
+    "backfaceCulling": false,
+    "bvhLeafSize": 4,
+    "ambientStrength": 0.5,
+    "backgroundColor": [0.5, 0.5, 0.5],
+    "shadowBias": 0.001,
+    "reflectionBias": 0.001
+  },
+  "materials": [
+    {
+      "albedo": [1.0, 1.0, 1.0],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0
+    },
+    {
+      "albedo": [0.0, 1.0, 0.0],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0
+    },
+    {
+      "albedo": [0.0, 0.0, 1.0],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0
+    },
+    {
+      "albedo": [1.0, 1.0, 1.0],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [-0.3, -1.0, -0.5],
+      "color": [1.0, 1.0, 1.0],
+      "intensity": 1.0
+    }
+  ],
+  "objects": [
+    {
+      "type": "plane",
+      "materialIndex": 3,
+      "size": [10.0, 10.0]
+    },
+    {
+      "type": "cube",
+      "materialIndex": 0,
+      "size": [1.0, 1.0, 1.0],
+      "transform": {
+        "position": [-1.5, 0.5, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "materialIndex": 1,
+      "size": [1.0, 1.0, 1.0],
+      "transform": {
+        "position": [0.0, 0.5, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "materialIndex": 2,
+      "size": [1.0, 1.0, 1.0],
+      "transform": {
+        "position": [1.5, 0.5, 0.0]
+      }
+    }
+  ]
+}

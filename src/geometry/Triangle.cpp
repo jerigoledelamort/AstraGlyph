@@ -70,11 +70,15 @@ bool Triangle::intersect(const Ray& ray, HitInfo& hitInfo, bool backfaceCulling)
     shadingNormal = normalize(n0 * w + n1 * u + n2 * v);
   }
 
+  // Interpolate UV coordinates using barycentric coordinates
+  const Vec2 interpolatedUv = uv0 * w + uv1 * u + uv2 * v;
+
   hitInfo.hit = true;
   hitInfo.t = t;
   hitInfo.position = ray.at(t);
   hitInfo.normal = shadingNormal;
   hitInfo.barycentric = Vec3{w, u, v};
+  hitInfo.uv = interpolatedUv;
   hitInfo.materialId = materialId;
   return true;
 }

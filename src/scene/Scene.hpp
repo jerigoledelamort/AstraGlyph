@@ -21,6 +21,7 @@ public:
   [[nodiscard]] const std::vector<Entity>& entities() const noexcept;
   [[nodiscard]] const std::vector<Mesh>& meshes() const noexcept;
   [[nodiscard]] const std::vector<Material>& materials() const noexcept;
+  [[nodiscard]] std::size_t getMaterialCount() const noexcept;
   [[nodiscard]] const std::vector<Light>& lights() const noexcept;
   [[nodiscard]] const std::vector<Triangle>& triangles() const noexcept;
   [[nodiscard]] const Material& materialFor(int materialId) const noexcept;

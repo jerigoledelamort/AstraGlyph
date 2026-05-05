@@ -1,5 +1,8 @@
 #include "geometry/ObjLoader.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "D:/Projects/AstraGlyph/third_party/stb/stb_image.h"
+
 #include <cctype>
 #include <cmath>
 #include <fstream>
@@ -20,6 +23,19 @@ struct FaceVertex {
   std::size_t normalIndex{0};
   bool hasTexCoord{false};
   bool hasNormal{false};
+};
+
+struct MtlMaterial {
+  std::string name;
+  Vec3 albedo{1.0F, 1.0F, 1.0F};
+  float roughness{0.5F};
+  float metallic{0.0F};
+  float reflectivity{0.0F};
+  Vec3 emissionColor{0.0F, 0.0F, 0.0F};
+  float emissionStrength{0.0F};
+  std::string albedoTexturePath;
+  std::string metallicTexturePath;
+  std::string roughnessTexturePath;
 };
 
 [[nodiscard]] std::string trim(std::string_view text)
@@ -229,7 +245,242 @@ struct FaceVertex {
   return triangle;
 }
 
+// Forward declarations for MTL parsing functions
+[[nodiscard]] std::vector<MtlMaterial> parseMtlFile(
+    const std::filesystem::path& mtlPath,
+    const std::filesystem::path& baseDirectory);
+void loadTextures(
+    std::vector<Material>& materials,
+    const std::vector<MtlMaterial>& mtlMaterials,
+    const std::filesystem::path& baseDirectory);
+Material convertMaterial(const MtlMaterial& mtlMat);
+
+// Parse MTL file and return materials map
+[[nodiscard]] std::vector<MtlMaterial> parseMtlFile(
+    const std::filesystem::path& mtlPath,
+    [[maybe_unused]] const std::filesystem::path& baseDirectory)
+{
+  std::vector<MtlMaterial> materials;
+  std::ifstream input(mtlPath);
+  if (!input) {
+    return materials;
+  }
+
+  MtlMaterial currentMaterial;
+  bool hasCurrentMaterial = false;
+
+  std::string line;
+  std::size_t lineNumber = 0;
+  while (std::getline(input, line)) {
+    ++lineNumber;
+
+    const std::size_t comment = line.find('#');
+    const std::string_view lineView = std::string_view{line}.substr(0, comment);
+    const std::string trimmedLine = trim(lineView);
+    if (trimmedLine.empty()) {
+      continue;
+    }
+
+    std::istringstream lineStream(trimmedLine);
+    std::string tag;
+    lineStream >> tag;
+
+    if (tag == "newmtl") {
+      // Save previous material if exists
+      if (hasCurrentMaterial) {
+        materials.push_back(currentMaterial);
+      }
+      // Start new material
+      currentMaterial = MtlMaterial{};
+      std::getline(lineStream, currentMaterial.name);
+      currentMaterial.name = trim(currentMaterial.name);
+      hasCurrentMaterial = true;
+      continue;
+    }
+
+    if (!hasCurrentMaterial) {
+      continue;
+    }
+
+    if (tag == "Kd" || tag == "kd") {
+      lineStream >> currentMaterial.albedo.x >> currentMaterial.albedo.y >> currentMaterial.albedo.z;
+      continue;
+    }
+
+    if (tag == "Ke" || tag == "ke") {
+      lineStream >> currentMaterial.emissionColor.x >> currentMaterial.emissionColor.y >> currentMaterial.emissionColor.z;
+      continue;
+    }
+
+    if (tag == "Ns" || tag == "ns") {
+      float specularExponent = 0.0F;
+      lineStream >> specularExponent;
+      // Convert specular exponent to roughness (approximate)
+      currentMaterial.roughness = 1.0F - (specularExponent / 1000.0F);
+      currentMaterial.roughness = std::clamp(currentMaterial.roughness, 0.0F, 1.0F);
+      continue;
+    }
+
+    if (tag == "d" || tag == "Tr") {
+      float transparency = 0.0F;
+      lineStream >> transparency;
+      currentMaterial.reflectivity = 1.0F - transparency;
+      continue;
+    }
+
+    if (tag == "map_Kd" || tag == "map_Ka" || tag == "map_Ks") {
+      // Albedo/diffuse texture
+      std::string texturePath;
+      std::getline(lineStream, texturePath);
+      currentMaterial.albedoTexturePath = trim(texturePath);
+      continue;
+    }
+
+    if (tag == "map_Metalness" || tag == "map_metallic" || tag == "map_Km" || tag == "map_refl") {
+      std::string texturePath;
+      std::getline(lineStream, texturePath);
+      currentMaterial.metallicTexturePath = trim(texturePath);
+      continue;
+    }
+
+    if (tag == "map_Pm" || tag == "map_roughness" || tag == "map_Pr" || tag == "map_d") {
+      std::string texturePath;
+      std::getline(lineStream, texturePath);
+      currentMaterial.roughnessTexturePath = trim(texturePath);
+      continue;
+    }
+
+    if (tag == "map_Ns") {
+      // map_Ns (specular exponent map) can be used as roughness texture
+      std::string texturePath;
+      std::getline(lineStream, texturePath);
+      currentMaterial.roughnessTexturePath = trim(texturePath);
+      continue;
+    }
+
+    // Ignore bump/normal maps for now
+    if (tag == "map_Bump" || tag == "bump") {
+      continue;
+    }
+  }
+
+  // Save last material
+  if (hasCurrentMaterial) {
+    // If Kd (diffuse) was not specified, default to white
+    if (currentMaterial.albedo.x == 0.0F && currentMaterial.albedo.y == 0.0F && currentMaterial.albedo.z == 0.0F) {
+      currentMaterial.albedo = Vec3{1.0F, 1.0F, 1.0F};
+    }
+    materials.push_back(currentMaterial);
+  }
+
+  return materials;
+}
+
+// Load textures for materials using stb_image
+void loadTextures(
+    std::vector<Material>& materials,
+    const std::vector<MtlMaterial>& mtlMaterials,
+    const std::filesystem::path& baseDirectory)
+{
+  const std::filesystem::path textureBaseDir = baseDirectory.parent_path();
+
+  for (std::size_t i = 0; i < materials.size() && i < mtlMaterials.size(); ++i) {
+    Material& mat = materials[i];
+    const MtlMaterial& mtlMat = mtlMaterials[i];
+
+    // Load albedo texture
+    if (!mtlMat.albedoTexturePath.empty()) {
+      const std::filesystem::path fullPath = textureBaseDir / mtlMat.albedoTexturePath;
+      int width = 0, height = 0, channels = 0;
+      unsigned char* data = stbi_load(fullPath.string().c_str(), &width, &height, &channels, 0);
+
+      if (data != nullptr && width > 0 && height > 0) {
+        mat.albedoTextureData.assign(data, data + width * height * channels);
+        mat.albedoTextureWidth = width;
+        mat.albedoTextureHeight = height;
+        mat.albedoTextureChannels = channels;
+        mat.hasAlbedoTexture = true;
+        stbi_image_free(data);
+      }
+    }
+
+    // Load metallic texture
+    if (!mtlMat.metallicTexturePath.empty()) {
+      const std::filesystem::path fullPath = textureBaseDir / mtlMat.metallicTexturePath;
+      int width = 0, height = 0, channels = 0;
+      unsigned char* data = stbi_load(fullPath.string().c_str(), &width, &height, &channels, 0);
+
+      if (data != nullptr && width > 0 && height > 0) {
+        mat.metallicTextureData.assign(data, data + width * height * channels);
+        mat.metallicTextureWidth = width;
+        mat.metallicTextureHeight = height;
+        mat.metallicTextureChannels = channels;
+        mat.hasMetallicTexture = true;
+        stbi_image_free(data);
+      }
+    }
+
+    // Load roughness texture
+    if (!mtlMat.roughnessTexturePath.empty()) {
+      const std::filesystem::path fullPath = textureBaseDir / mtlMat.roughnessTexturePath;
+      int width = 0, height = 0, channels = 0;
+      unsigned char* data = stbi_load(fullPath.string().c_str(), &width, &height, &channels, 0);
+
+      if (data != nullptr && width > 0 && height > 0) {
+        mat.roughnessTextureData.assign(data, data + width * height * channels);
+        mat.roughnessTextureWidth = width;
+        mat.roughnessTextureHeight = height;
+        mat.roughnessTextureChannels = channels;
+        mat.hasRoughnessTexture = true;
+        stbi_image_free(data);
+      }
+    }
+  }
+}
+
+// Convert MtlMaterial to Material
+Material convertMaterial(const MtlMaterial& mtlMat)
+{
+  Material mat{};
+  mat.albedo = mtlMat.albedo;
+  mat.roughness = mtlMat.roughness;
+  mat.metallic = mtlMat.metallic;
+  mat.reflectivity = mtlMat.reflectivity;
+  mat.emissionColor = mtlMat.emissionColor;
+  mat.emissionStrength = mtlMat.emissionStrength;
+  mat.albedoTexturePath = mtlMat.albedoTexturePath;
+  mat.metallicTexturePath = mtlMat.metallicTexturePath;
+  mat.roughnessTexturePath = mtlMat.roughnessTexturePath;
+  return mat;
+}
+
 } // namespace
+
+std::vector<Material> ObjLoader::loadMaterials(
+    const std::filesystem::path& mtlPath,
+    bool loadTexturesEnabled)
+{
+  std::vector<Material> materials;
+  
+  if (!std::filesystem::exists(mtlPath)) {
+    return materials;
+  }
+
+  const std::vector<MtlMaterial> mtlMaterials = parseMtlFile(mtlPath, mtlPath);
+  
+  // Convert MTL materials to internal Material format
+  materials.reserve(mtlMaterials.size());
+  for (const auto& mtlMat : mtlMaterials) {
+    materials.push_back(convertMaterial(mtlMat));
+  }
+
+  // Load textures if requested
+  if (loadTexturesEnabled) {
+    loadTextures(materials, mtlMaterials, mtlPath);
+  }
+
+  return materials;
+}
 
 Mesh ObjLoader::loadFromFile(const std::filesystem::path& path, const ObjLoadOptions& options)
 {

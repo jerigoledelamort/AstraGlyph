@@ -48,12 +48,14 @@ Vec3 AsciiMapper::applyExposureGamma(const Vec3& radiance, float exposure, float
   const float safeGamma = gamma > 0.0F ? gamma : 2.2F;
   const float invGamma = 1.0F / safeGamma;
 
-  const auto toneMap = [&](float channel) noexcept {
-    const float mapped = 1.0F - std::exp(-std::max(channel, 0.0F) * safeExposure);
-    return std::pow(clamp01(mapped), invGamma);
+  // Simple exposure and gamma (no tone mapping for direct sRGB mapping)
+  const auto apply = [&](float channel) noexcept {
+    const float withExposure = std::max(channel * safeExposure, 0.0F);
+    const float clamped = std::clamp(withExposure, 0.0F, 1.0F);
+    return std::pow(clamped, invGamma);
   };
 
-  return {toneMap(radiance.x), toneMap(radiance.y), toneMap(radiance.z)};
+  return {apply(radiance.x), apply(radiance.y), apply(radiance.z)};
 }
 
 char AsciiMapper::map(float luminance) const noexcept

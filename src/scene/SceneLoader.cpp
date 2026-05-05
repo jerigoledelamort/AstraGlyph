@@ -1,17 +1,16 @@
 #include "scene/SceneLoader.hpp"
 
-#include "geometry/MeshFactory.hpp"
+#include "scene/Scene.hpp"
+#include "scene/Camera.hpp"
+#include "scene/Material.hpp"
+#include "scene/Light.hpp"
 #include "geometry/ObjLoader.hpp"
-#include "math/Vec3.hpp"
+#include "geometry/MeshFactory.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <cmath>
 #include <fstream>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include <sstream>
 
 namespace astraglyph {
 namespace {
@@ -140,6 +139,9 @@ void parseRenderSettings(RenderSettings& settings, const json& obj)
   if (obj.contains("reflectionBias")) {
     settings.reflectionBias = obj["reflectionBias"].get<float>();
   }
+  if (obj.contains("debugAlbedoOnly")) {
+    settings.debugAlbedoOnly = obj["debugAlbedoOnly"].get<bool>();
+  }
   settings.validate();
 }
 
@@ -190,6 +192,17 @@ void parseCamera(Camera& camera, const json& obj)
     if (matObj.contains("emissionStrength")) {
       mat.emissionStrength = matObj["emissionStrength"].get<float>();
     }
+    
+    // Support loading materials from MTL file
+    if (matObj.contains("mtlPath")) {
+      const std::filesystem::path mtlPath = resolveAssetPathImpl(matObj["mtlPath"].get<std::string>());
+      const std::vector<Material> mtlMaterials = ObjLoader::loadMaterials(mtlPath, true);
+      if (!mtlMaterials.empty()) {
+        // Use the first material from MTL file
+        mat = mtlMaterials[0];
+      }
+    }
+    
     scene.addMaterial(mat);
 
     if (matObj.contains("name")) {
@@ -311,7 +324,32 @@ void parseObjects(
       if (obj.contains("path")) {
         const std::filesystem::path objPath = resolveAssetPathImpl(obj["path"].get<std::string>());
         try {
-          mesh = ObjLoader::loadFromFile(objPath, ObjLoadOptions{static_cast<int>(materialIndex)});
+          // Load materials from MTL file FIRST, before loading the mesh
+          std::filesystem::path mtlPath;
+          if (obj.contains("mtlPath")) {
+            mtlPath = resolveAssetPathImpl(obj["mtlPath"].get<std::string>());
+          } else {
+            // Try to find MTL file next to OBJ
+            mtlPath = objPath.parent_path() / (objPath.stem().string() + ".mtl");
+          }
+          
+          // Load MTL materials and add to scene before loading mesh
+          std::size_t mtlMaterialStartIndex = scene.getMaterialCount();
+          if (std::filesystem::exists(mtlPath)) {
+            const std::vector<Material> mtlMaterials = ObjLoader::loadMaterials(mtlPath, true);
+            for (const auto& mtlMat : mtlMaterials) {
+              scene.addMaterial(mtlMat);
+            }
+          }
+          
+          // If no MTL material loaded, add a default white material
+          if (scene.getMaterialCount() == mtlMaterialStartIndex) {
+            scene.addMaterial(Material{});  // Default: white albedo (1,1,1)
+          }
+          
+          // Use the first MTL material index for all triangles in this OBJ
+          const std::size_t objMaterialIndex = mtlMaterialStartIndex;
+          mesh = ObjLoader::loadFromFile(objPath, ObjLoadOptions{static_cast<int>(objMaterialIndex)});
         } catch (const std::exception&) {
           mesh = MeshFactory::createCube(0.1F, static_cast<int>(materialIndex));
         }
