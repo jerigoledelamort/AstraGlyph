@@ -29,6 +29,12 @@ struct RenderMetrics {
   bool temporalAccumulation{false};
   int threadCountUsed{0};
   bool enableMultithreading{false};
+  bool renderProfilingEnabled{false};
+  double bvhTraversalMs{0.0};
+  double triangleIntersectionMs{0.0};
+  double shadingMs{0.0};
+  double finalOutputMs{0.0};
+  double totalRenderMs{0.0};
 };
 
 } // namespace astraglyph

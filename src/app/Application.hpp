@@ -27,6 +27,9 @@ private:
   void render();
   void handleRuntimeSettingsInput();
   void updateWindowTitle();
+  void renderSceneToFramebuffer();
+  void renderDebugOverlay(const std::vector<std::string>& debugLines, int overlayScale);
+  void renderSettingsPanel(int debugPanelHeight);
   void renderGlyph(
       char glyph,
       int x,

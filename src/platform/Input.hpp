@@ -33,6 +33,7 @@ enum class Key : std::size_t {
   Escape,
   F1,
   F2,
+  F3,
   Count
 };
 

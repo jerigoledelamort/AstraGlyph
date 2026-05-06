@@ -43,6 +43,7 @@ void Scene::addEntity(Entity entity)
 {
   addMesh(entity.mesh);
   entities_.push_back(std::move(entity));
+  ++version_;
 }
 
 void Scene::addMesh(Mesh mesh)
@@ -50,6 +51,7 @@ void Scene::addMesh(Mesh mesh)
   const auto& meshTriangles = mesh.triangles();
   triangles_.insert(triangles_.end(), meshTriangles.begin(), meshTriangles.end());
   meshes_.push_back(std::move(mesh));
+  ++version_;
 }
 
 void Scene::addMeshFromObj(const std::filesystem::path& path, int materialId)
@@ -62,11 +64,13 @@ void Scene::addMeshFromObj(const std::filesystem::path& path, int materialId)
 void Scene::addMaterial(Material material)
 {
   materials_.push_back(material);
+  ++version_;
 }
 
 void Scene::addLight(Light light)
 {
-  lights_.push_back(light);
+  lights_.push_back(std::move(light));
+  ++version_;
 }
 
 const std::vector<Entity>& Scene::entities() const noexcept

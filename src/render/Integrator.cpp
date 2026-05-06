@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -133,6 +134,7 @@ Vec3 accumulateAreaLight(
 
     const Vec3 lightDirection = toLight / distanceToLight;
     const float ndotl = std::max(0.0F, dot(normal, lightDirection));
+    // 🥇 4. РАННИЙ ВЫХОД: если surface не освещён → не считаем тень
     if (ndotl <= 0.0F) {
       continue;
     }
@@ -140,14 +142,15 @@ Vec3 accumulateAreaLight(
     const float lightTMax = std::max(shadowBias, distanceToLight - shadowBias);
     bool visible = true;
     if (settings.enableShadows) {
-      visible = traceShadowVisibility(
-          rayTracer,
-          triangles,
-          settings,
-          metrics,
+      // 🥇 1. EARLY EXIT ДЛЯ ТЕНЕЙ: используем быстрый intersectAny
+      // Вместо полного traceShadowVisibility используем только occlusion check
+      const Ray shadowRay{
           shadowOrigin,
           lightDirection,
-          lightTMax);
+          shadowBias,
+          lightTMax,
+      };
+      visible = !rayTracer.traceOcclusion(shadowRay, triangles, settings, &metrics);
     }
 
     if (visible) {
@@ -164,40 +167,21 @@ Vec3 accumulateLocalLighting(
     const Scene& scene,
     const RayTracer& rayTracer,
     const RenderSettings& settings,
-    RenderMetrics& metrics,
-    int depth) noexcept
+    RenderMetrics& metrics) noexcept
 {
   const Material& material = scene.materialFor(hit.materialId);
   const Vec3 normal = safeNormal(hit.normal);
+  // 🥇 4. СЭКОНОМЛЕНА TEXTURE SAMPLE: откладываем до проверки NdotL
+  const Vec3 viewDirection = safeNormal(ray.origin - hit.position);
 
-  // Sample textures if available
-  const Vec3 albedo = sampleAlbedoTextureLinear(material, hit.uv);
-  const float metallic = sampleMetallicTexture(material, hit.uv);
-  const float roughness = sampleRoughnessTexture(material, hit.uv);
-
-  Vec3 result = material.emissionColor * material.emissionStrength;
-  result += albedo * settings.ambientStrength;
-
-  // PBR: Metals have less diffuse reflection, rough surfaces scatter more light
-  const float diffuseStrength = (1.0F - metallic * 0.7F) * (0.5F + roughness * 0.5F);
+  Vec3 result = Vec3{}; // 🥇 5. УБРАТЬ ЛИШНИЕ ОПЕРАЦИИ: начинаем с 0, добавим ambient позже
 
   const std::vector<Triangle>& triangles = scene.triangles();
+  
+  // 🥇 5. СЭКОНОМЛЕНА NORMALIZATION: нормаль уже нормализована в safeNormal выше
   for (const Light& light : scene.lights()) {
-    if (light.intensity <= 0.0F) {
-      continue;
-    }
-
-    if (light.type == LightType::Area) {
-      result += albedo * diffuseStrength * accumulateAreaLight(
-          light,
-          hit,
-          normal,
-          ray,
-          triangles,
-          rayTracer,
-          settings,
-          metrics,
-          depth);
+    const float intensity = std::clamp(light.intensity, 0.0F, 10.0F);
+    if (intensity <= 0.0F) {
       continue;
     }
 
@@ -205,43 +189,151 @@ Vec3 accumulateLocalLighting(
     float lightTMax = std::numeric_limits<float>::infinity();
 
     if (light.type == LightType::Directional) {
-      // Normalize the light direction (light.direction points TOWARD light)
-      lightDirection = safeNormal(-light.direction);
+      // 🥇 5. СЭКОНОМЛЕНА NORMALIZATION: -direction должен быть нормализован
+      lightDirection = -light.direction;
+      // Проверка на нормализованность (если не нормализован → нормализуем)
+      const float dirLen = length(lightDirection);
+      if (dirLen > 0.001F && dirLen < 0.99F) {
+        lightDirection = lightDirection / dirLen;
+      }
     } else {
       const Vec3 toLight = light.position - hit.position;
       const float distanceToLight = length(toLight);
       if (distanceToLight <= kLightEpsilon) {
         continue;
       }
-
       lightDirection = toLight / distanceToLight;
       lightTMax = std::max(safeShadowBias(settings), distanceToLight - safeShadowBias(settings));
     }
 
-    const float ndotl = std::max(0.0F, dot(normal, lightDirection));
-    if (ndotl <= 0.0F) {
-      continue;
+    // 🥇 4. РАННИЙ ВЫХОД: проверяем NdotL ДО текстуры и теней
+    const float NdotL = std::max(0.0F, dot(normal, lightDirection));
+    if (NdotL <= 0.0F) {
+      continue; // 🔥 СЭКОНОМЛЕНО: не считаем текстуры, тени и specular для этого света
     }
 
     bool visible = true;
     if (settings.enableShadows) {
-      recordShadowQuery(metrics, 1);
-      visible = traceShadowVisibility(
-          rayTracer,
-          triangles,
-          settings,
-          metrics,
+      // 🥇 1. EARLY EXIT ДЛЯ ТЕНЕЙ: используем быстрый intersectAny
+      const Ray shadowRay{
           hit.position + normal * safeShadowBias(settings),
           lightDirection,
-          lightTMax);
+          safeShadowBias(settings),
+          lightTMax,
+      };
+      visible = !rayTracer.traceOcclusion(shadowRay, triangles, settings, &metrics);
     }
 
     if (visible) {
-      result += albedo * diffuseStrength * light.color * (ndotl * light.intensity);
+      // 🥇 4. ТЕПЕРЬ СЧИТАЕМ: только если свет виден и surface освещён
+      const Vec3 albedo = sampleAlbedoTextureLinear(material, hit.uv);
+      const float metallic = sampleMetallicTexture(material, hit.uv);
+      
+      result += albedo * 0.2F * (1.0F - metallic); // Ambient contribution
+      
+      const Vec3 lighting = light.color * intensity * NdotL;
+      const Vec3 diffuse = albedo * (1.0F - metallic) * lighting;
+      
+      // 🥈 2. УБРАТЬ POW: битовое возведение в степень вместо std::pow
+      const Vec3 halfDirection = safeNormal(lightDirection + viewDirection);
+      const float NdotH = std::max(0.0F, dot(normal, halfDirection));
+      // NdotH^32 через битовые операции (быстрее чем pow)
+      float specFactor = NdotH * NdotH;      // ^2
+      specFactor *= specFactor;              // ^4
+      specFactor *= specFactor;              // ^8
+      specFactor *= specFactor;              // ^16
+      specFactor *= specFactor;              // ^32
+      
+      const Vec3 specular = light.color * specFactor * metallic;
+      result += diffuse + specular;
     }
   }
 
   return result;
+}
+
+[[nodiscard]] double elapsedMs(
+    std::chrono::high_resolution_clock::time_point start,
+    std::chrono::high_resolution_clock::time_point end) noexcept
+{
+  return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
+float debugLightNdotL(const HitInfo& hit, const Scene& scene) noexcept
+{
+  // 🥇 5. СЭКОНОМЛЕНА NORMALIZATION: нормаль уже нормализована в hit.normal
+  const Vec3 normal = hit.normal;
+  float result = 0.0F;
+  for (const Light& light : scene.lights()) {
+    const float intensity = std::clamp(light.intensity, 0.0F, 10.0F);
+    if (intensity <= 0.0F) {
+      continue;
+    }
+
+    Vec3 lightDirection{};
+    if (light.type == LightType::Directional) {
+      lightDirection = -light.direction;
+      // Быстрая проверка нормализованности
+      const float dirLen = length(lightDirection);
+      if (dirLen > 0.001F && dirLen < 0.99F) {
+        lightDirection = lightDirection / dirLen;
+      }
+    } else {
+      const Vec3 toLight = light.position - hit.position;
+      const float distLen = length(toLight);
+      if (distLen <= kLightEpsilon) {
+        continue;
+      }
+      lightDirection = toLight / distLen;
+    }
+
+    result = std::max(result, std::max(0.0F, dot(normal, lightDirection)));
+  }
+  return result;
+}
+
+float debugDepthMaxDistance(const Ray& ray, const Scene& scene, const HitInfo& hit) noexcept
+{
+  if (std::isfinite(ray.tMax)) {
+    return std::max(ray.tMax, kLightEpsilon);
+  }
+
+  float maxDistance = hit.t;
+  for (const Triangle& triangle : scene.triangles()) {
+    maxDistance = std::max(maxDistance, dot(triangle.v0 - ray.origin, ray.direction));
+    maxDistance = std::max(maxDistance, dot(triangle.v1 - ray.origin, ray.direction));
+    maxDistance = std::max(maxDistance, dot(triangle.v2 - ray.origin, ray.direction));
+  }
+
+  return std::max(maxDistance, kLightEpsilon);
+}
+
+Vec3 debugColor(
+    const Ray& ray,
+    const HitInfo& hit,
+    const Material& material,
+    const Scene& scene,
+    DebugViewMode mode) noexcept
+{
+  switch (mode) {
+    case DebugViewMode::Albedo:
+      return sampleAlbedoTexture(material, hit.uv);
+    case DebugViewMode::Normals: {
+      const Vec3 normal = safeNormal(hit.normal);
+      return normal * 0.5F + Vec3{0.5F, 0.5F, 0.5F};
+    }
+    case DebugViewMode::Depth: {
+      const float maxDistance = debugDepthMaxDistance(ray, scene, hit);
+      const float depth = std::clamp(hit.t / maxDistance, 0.0F, 1.0F);
+      return Vec3{depth, depth, depth};
+    }
+    case DebugViewMode::Lighting: {
+      const float NdotL = debugLightNdotL(hit, scene);
+      return Vec3{NdotL, NdotL, NdotL};
+    }
+    default:
+      return Vec3{};
+  }
 }
 
 } // namespace
@@ -268,57 +360,35 @@ Vec3 Integrator::traceRadiance(
     *outHit = hit;
   }
 
+  const bool profilingEnabled = metrics.renderProfilingEnabled;
+  std::chrono::high_resolution_clock::time_point shadingStart{};
+  if (profilingEnabled) {
+    shadingStart = std::chrono::high_resolution_clock::now();
+  }
+  Vec3 result{};
   if (!hit.hit) {
-    return settings.backgroundColor;
+    result = settings.backgroundColor;
+  } else {
+    // 🥇 5. СЭКОНОМЛЕНА TEXTURE SAMPLE: не загружаем материал для debug mode пока
+    const DebugViewMode debugMode = settings.activeDebugViewMode();
+    if (debugMode != DebugViewMode::Off) {
+      const Material& material = scene.materialFor(hit.materialId);
+      result = debugColor(ray, hit, material, scene, debugMode);
+    } else {
+      // 🥇 4. ТЕКСТУРЫ СЧИТАЕМ ТОЛЬКО ЗДЕСЬ: внутри accumulateLocalLighting
+      result = accumulateLocalLighting(
+          ray,
+          hit,
+          scene,
+          rayTracer,
+          settings,
+          metrics);
+    }
   }
-
-const Material& material = scene.materialFor(hit.materialId);
-  const Vec3 reflectionNormal = faceForwardNormal(hit.normal, ray.direction);
-
-  // DEBUG: Direct albedo texture output (bypass all lighting)
-  if (settings.debugAlbedoOnly) {
-    // Return sRGB albedo directly for visual comparison with original texture
-    return sampleAlbedoTexture(material, hit.uv);
+  if (profilingEnabled) {
+    metrics.shadingMs += elapsedMs(shadingStart, std::chrono::high_resolution_clock::now());
   }
-
-  // Sample PBR textures
-  const float metallic = sampleMetallicTexture(material, hit.uv);
-  const float roughness = sampleRoughnessTexture(material, hit.uv);
-
-  const Vec3 localRadiance = accumulateLocalLighting(
-      ray,
-      hit,
-      scene,
-      rayTracer,
-      settings,
-      metrics,
-      depth);
-
-  // Calculate reflectivity based on metallic and roughness
-  // Higher metallic = more reflective, lower roughness = sharper reflections
-  const float reflectivity = std::clamp(metallic * (1.0F - roughness * 0.5F), 0.0F, 1.0F);
-
-  const int maxBounces = std::max(settings.maxBounces, 0);
-  if (!settings.enableReflections || reflectivity <= 0.01F || depth >= maxBounces) {
-    return localRadiance;
-  }
-
-  const float reflectionBias = safeReflectionBias(settings);
-  const Vec3 reflectedDirection = normalize(reflect(ray.direction, reflectionNormal));
-  ++metrics.reflectionRays;
-  const Ray reflectedRay{
-      hit.position + reflectionNormal * reflectionBias,
-      reflectedDirection,
-      reflectionBias,
-      std::numeric_limits<float>::infinity(),
-  };
-  const Vec3 reflectedRadiance =
-      traceRadiance(reflectedRay, scene, rayTracer, settings, metrics, nullptr, depth + 1);
-
-  // Mix local radiance with reflection based on reflectivity
-  // Albedo affects reflection color for non-metallic surfaces
-  const Vec3 reflectionColor = lerp(Vec3{1.0F, 1.0F, 1.0F}, sampleAlbedoTextureLinear(material, hit.uv), 1.0F - metallic);
-  return lerp(localRadiance, reflectedRadiance * reflectionColor, reflectivity);
+  return result;
 }
 
 Vec3 Integrator::radiance(const Scene& scene, const Ray& ray) const

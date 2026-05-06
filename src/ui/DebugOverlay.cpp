@@ -41,6 +41,28 @@ std::vector<std::string> DebugOverlay::buildLines(
   stream << "FPS: " << fps << "  FRAME MS: " << frameTimeMs;
   lines.push_back(stream.str());
 
+  if (metrics.renderProfilingEnabled) {
+    stream.str({});
+    stream.clear();
+    stream << std::setprecision(2) << "BVH: " << metrics.bvhTraversalMs << " ms";
+    lines.push_back(stream.str());
+
+    stream.str({});
+    stream.clear();
+    stream << "Intersect: " << metrics.triangleIntersectionMs << " ms";
+    lines.push_back(stream.str());
+
+    stream.str({});
+    stream.clear();
+    stream << "Shading: " << metrics.shadingMs << " ms";
+    lines.push_back(stream.str());
+
+    stream.str({});
+    stream.clear();
+    stream << "Total: " << metrics.totalRenderMs << " ms";
+    lines.push_back(stream.str());
+  }
+
   stream.str({});
   stream.clear();
   stream << "GRID: " << settings.gridWidth << "X" << settings.gridHeight

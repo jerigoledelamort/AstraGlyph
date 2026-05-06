@@ -29,12 +29,15 @@ public:
 
   [[nodiscard]] static Scene createDefaultScene();
 
+  [[nodiscard]] std::size_t version() const noexcept { return version_; }
+
 private:
   std::vector<Entity> entities_{};
   std::vector<Mesh> meshes_{};
   std::vector<Material> materials_{};
   std::vector<Light> lights_{};
   std::vector<Triangle> triangles_{};
+  std::size_t version_{0};
 };
 
 } // namespace astraglyph

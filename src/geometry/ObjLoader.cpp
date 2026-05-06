@@ -1,7 +1,7 @@
 #include "geometry/ObjLoader.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "D:/Projects/AstraGlyph/third_party/stb/stb_image.h"
+#include "stb/stb_image.h"
 
 #include <cctype>
 #include <cmath>

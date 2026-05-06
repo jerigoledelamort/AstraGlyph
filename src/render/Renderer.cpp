@@ -1,17 +1,20 @@
 #include "render/Renderer.hpp"
 
+#include "render/AsciiFramebuffer.hpp"
 #include "render/AsciiMapper.hpp"
 #include "render/Sampler.hpp"
 #include "scene/Scene.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
-#include <future>
-#include <limits>
+#include <thread>
 #include <vector>
 
 namespace astraglyph {
 namespace {
+
+constexpr int kMinTilesPerThread = 8;  // Минимальное количество тайлов на поток
 
 struct RunningVariance {
   int count{0};
@@ -41,11 +44,24 @@ struct RunningVariance {
   return std::clamp(value, 1, 16);
 }
 
+[[nodiscard]] double elapsedMs(
+    std::chrono::high_resolution_clock::time_point start,
+    std::chrono::high_resolution_clock::time_point end)
+{
+  return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
 } // namespace
 
 const RenderMetrics& Renderer::metrics() const noexcept
 {
   return metrics_;
+}
+
+void Renderer::setPresentationProfiling(double finalOutputMs, double totalRenderMs) noexcept
+{
+  metrics_.finalOutputMs = finalOutputMs;
+  metrics_.totalRenderMs = totalRenderMs;
 }
 
 bool Renderer::accumulationDirty() const noexcept
@@ -125,6 +141,9 @@ void Renderer::mergeMetrics(
   dest.bvhNodes = std::max(dest.bvhNodes, src.bvhNodes);
   dest.bvhLeaves = std::max(dest.bvhLeaves, src.bvhLeaves);
   dest.accumulatedFrames = std::max(dest.accumulatedFrames, src.accumulatedFrames);
+  dest.bvhTraversalMs += src.bvhTraversalMs;
+  dest.triangleIntersectionMs += src.triangleIntersectionMs;
+  dest.shadingMs += src.shadingMs;
 
   if (dest.shadowQueries > 0 && src.shadowQueries > 0) {
     dest.averageShadowSamples =
@@ -154,11 +173,14 @@ void Renderer::renderTile(
   const int maxSamples = std::max(baseSamples, clampConfiguredSamples(settings.maxSamplesPerCell));
 
   result.metrics = RenderMetrics{};
+  result.metrics.renderProfilingEnabled = settings.enableRenderProfiling;
   result.maxAccumulatedFrames = 0;
   result.totalSamplesUsed = 0;
 
+  // Локальные накопители для минимизации обращений к памяти
   for (int y = yStart; y < yEnd; ++y) {
     for (int x = 0; x < targetWidth; ++x) {
+      // Локальные переменные для лучшего использования кэша
       Vec3 radianceSum{};
       Vec3 displaySum{};
       RunningVariance luminanceVariance{};
@@ -166,18 +188,20 @@ void Renderer::renderTile(
       int depthSamples = 0;
       int sampleCount = 0;
 
+      // Pre-compute ray parameters для этого cell
+      const float uBase = static_cast<float>(x) / static_cast<float>(targetWidth);
+      const float vBase = static_cast<float>(y) / static_cast<float>(settings.gridHeight);
+
       const auto traceSample = [&](int sampleIndex) {
         const Sample sample = sampler.generateSubCellSample(x, y, sampleIndex, settings);
-        const float u =
-            (static_cast<float>(x) + sample.uv.x) / static_cast<float>(targetWidth);
-        const float v =
-            (static_cast<float>(y) + sample.uv.y) / static_cast<float>(settings.gridHeight);
+        const float u = uBase + sample.uv.x / static_cast<float>(targetWidth);
+        const float v = vBase + sample.uv.y / static_cast<float>(settings.gridHeight);
         const Ray ray = camera.generateRay(u, v);
         HitInfo hit{};
         const Vec3 radiance = integrator_.traceRadiance(ray, scene, rayTracer_, settings, result.metrics, &hit);
 
-        // For debug albedo mode, bypass tone mapping and gamma
-        const Vec3 display = settings.debugAlbedoOnly 
+        // Debug views are already display-space values.
+        const Vec3 display = settings.isDebugViewEnabled()
             ? radiance 
             : mapper.applyExposureGamma(radiance, settings.exposure, settings.gamma);
         const float luminance = mapper.radianceToLuminance(display);
@@ -192,20 +216,20 @@ void Renderer::renderTile(
         ++sampleCount;
       };
 
+      // Базовые сэмплы
       for (int sampleIndex = 0; sampleIndex < baseSamples; ++sampleIndex) {
         traceSample(sampleIndex);
       }
 
-      bool usedAdaptiveSampling = false;
+      // Адаптивное сэмплирование
       if (settings.adaptiveSampling && sampleCount < maxSamples &&
           luminanceVariance.variance() > settings.adaptiveVarianceThreshold) {
-        usedAdaptiveSampling = true;
         for (int sampleIndex = sampleCount; sampleIndex < maxSamples; ++sampleIndex) {
           traceSample(sampleIndex);
         }
       }
 
-      if (usedAdaptiveSampling) {
+      if (sampleCount > baseSamples) {
         ++result.metrics.adaptiveCells;
       }
 
@@ -215,7 +239,6 @@ void Renderer::renderTile(
       const float inverseSampleCount = 1.0F / static_cast<float>(sampleCount);
       const Vec3 averageRadiance = radianceSum * inverseSampleCount;
       const Vec3 averageDisplay = displaySum * inverseSampleCount;
-      const float averageLuminance = static_cast<float>(luminanceVariance.mean);
       const float depth = depthSamples > 0
                               ? static_cast<float>(depthSum / static_cast<double>(depthSamples))
                               : std::numeric_limits<float>::infinity();
@@ -233,7 +256,7 @@ void Renderer::renderTile(
 
         const float invFrames = 1.0F / static_cast<float>(cell.accumulatedFrames);
         const Vec3 outputRadiance = cell.accumulatedRadiance * invFrames;
-        const Vec3 outputDisplay = settings.debugAlbedoOnly
+        const Vec3 outputDisplay = settings.isDebugViewEnabled()
             ? outputRadiance
             : mapper.applyExposureGamma(outputRadiance, settings.exposure, settings.gamma);
         const float outputLuminance = mapper.radianceToLuminance(outputDisplay);
@@ -248,7 +271,7 @@ void Renderer::renderTile(
         cell.accumulatedLuminance = outputLuminance;
         result.maxAccumulatedFrames = std::max(result.maxAccumulatedFrames, cell.accumulatedFrames);
       } else {
-        const Vec3 displayForLuminance = settings.debugAlbedoOnly
+        const Vec3 displayForLuminance = settings.isDebugViewEnabled()
             ? averageRadiance
             : mapper.applyExposureGamma(averageRadiance, settings.exposure, settings.gamma);
         const float luminanceFromRadiance = mapper.radianceToLuminance(displayForLuminance);
@@ -274,6 +297,12 @@ void Renderer::render(
     const Scene& scene,
     const RenderSettings& settings)
 {
+  const bool profilingEnabled = settings.enableRenderProfiling;
+  std::chrono::high_resolution_clock::time_point renderStart{};
+  if (profilingEnabled) {
+    renderStart = std::chrono::high_resolution_clock::now();
+  }
+
   RenderSettings activeSettings = settings;
   activeSettings.validate();
 
@@ -301,6 +330,7 @@ void Renderer::render(
   }
 
   metrics_ = RenderMetrics{};
+  metrics_.renderProfilingEnabled = activeSettings.enableRenderProfiling;
   metrics_.totalCells = static_cast<std::uint64_t>(targetWidth) * static_cast<std::uint64_t>(targetHeight);
   metrics_.temporalAccumulation = temporalOn;
 
@@ -309,35 +339,69 @@ void Renderer::render(
     rayTracer_.buildAcceleration(scene.triangles(), activeSettings.bvhLeafSize);
   }
 
+  // Определяем оптимальное количество потоков
+  int maxThreads = static_cast<int>(std::thread::hardware_concurrency());
+  if (maxThreads <= 0) {
+    maxThreads = 1;
+  }
+  
   int numThreads = activeSettings.enableMultithreading ? activeSettings.threadCount : 1;
   if (numThreads <= 0) {
-    numThreads = static_cast<int>(std::thread::hardware_concurrency());
-    if (numThreads <= 0) {
-      numThreads = 1;
-    }
+    numThreads = maxThreads;
   }
-  numThreads = std::min(numThreads, targetHeight);
+  // Ограничиваем количеством тайлов и доступными потоками
+  const int totalTiles = targetHeight;
+  numThreads = std::min(numThreads, std::max(1, totalTiles / kMinTilesPerThread));
+  numThreads = std::min(numThreads, maxThreads);
+  numThreads = std::max(numThreads, 1);
 
-  std::vector<TileResult> results(static_cast<std::size_t>(numThreads));
+  // Инициализация thread pool (однократно)
+  if (!threadPoolInitialized_.load()) {
+    threadPool_.start(static_cast<std::size_t>(maxThreads));
+    threadPoolInitialized_.store(true);
+  }
+  
+  // Убедимся, что thread pool имеет правильное количество потоков
+  if (threadPool_.threadCount() != static_cast<std::size_t>(maxThreads)) {
+    threadPool_.stop();
+    threadPool_.start(static_cast<std::size_t>(maxThreads));
+  }
 
-  if (numThreads == 1) {
+  // Результаты для каждого тайла (локальные, без mutex)
+  std::vector<TileResult> results(static_cast<std::size_t>(targetHeight));
+
+  if (numThreads == 1 || targetHeight <= 1) {
+    // Single-threaded fallback
     renderTile(framebuffer, camera, scene, activeSettings, 0, targetHeight, accumulationDirty_, results[0]);
   } else {
-    std::vector<std::future<void>> futures;
-    futures.reserve(static_cast<std::size_t>(numThreads));
-    for (int t = 0; t < numThreads; ++t) {
-      const int yStart = (t * targetHeight) / numThreads;
-      const int yEnd = ((t + 1) * targetHeight) / numThreads;
-      futures.push_back(std::async(std::launch::async,
-        [this, &framebuffer, &camera, &scene, &activeSettings, &results, t, yStart, yEnd]() {
-          renderTile(framebuffer, camera, scene, activeSettings, yStart, yEnd, this->accumulationDirty_, results[static_cast<std::size_t>(t)]);
-        }));
+    // Вычисляем размер тайла для равномерного распределения нагрузки
+    const int rowsPerTask = std::max((targetHeight + numThreads - 1) / numThreads, 1);
+    const int numTasks = (targetHeight + rowsPerTask - 1) / rowsPerTask;
+    
+    for (int task = 0; task < numTasks; ++task) {
+      const int yStart = task * rowsPerTask;
+      const int yEnd = std::min((task + 1) * rowsPerTask, targetHeight);
+      
+      if (yStart >= yEnd) {
+        continue;
+      }
+      
+      const bool localAccumulationDirty = accumulationDirty_;
+      threadPool_.enqueue([this, &framebuffer, &camera, &scene, &activeSettings,
+                          &results, yStart, yEnd, localAccumulationDirty]() {
+        for (int y = yStart; y < yEnd; ++y) {
+          TileResult& result = results[static_cast<std::size_t>(y)];
+          renderTile(framebuffer, camera, scene, activeSettings, y, y + 1, 
+                     localAccumulationDirty, result);
+        }
+      });
     }
-    for (auto& f : futures) {
-      f.get();
-    }
+    
+    // Ждем завершения всех задач
+    threadPool_.waitAll();
   }
 
+  // Агрегация результатов (быстрая, без блокировок в hot path)
   std::uint64_t totalSamplesUsed = 0;
   int maxAccumulatedFrames = 0;
 
@@ -354,6 +418,9 @@ void Renderer::render(
   metrics_.accumulatedFrames = maxAccumulatedFrames;
   metrics_.threadCountUsed = numThreads;
   metrics_.enableMultithreading = activeSettings.enableMultithreading;
+  if (activeSettings.enableRenderProfiling) {
+    metrics_.totalRenderMs = elapsedMs(renderStart, std::chrono::high_resolution_clock::now());
+  }
 }
 
 } // namespace astraglyph

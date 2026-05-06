@@ -78,15 +78,17 @@ std::vector<std::string> SettingsPanel::buildLines(const RenderSettings& setting
   stream << "COLOR " << enabledLabel(settings.colorOutput)
          << "  SHOW FPS " << enabledLabel(settings.showFps)
          << "  DEBUG " << enabledLabel(settings.showDebugInfo)
-         << "  ALBEDO ONLY " << enabledLabel(settings.debugAlbedoOnly);
+         << "  PROFILE " << enabledLabel(settings.enableRenderProfiling)
+         << "  VIEW " << RenderSettings::debugViewModeName(settings.activeDebugViewMode());
   lines.push_back(stream.str());
 
   lines.push_back("HOTKEYS");
   lines.push_back("F1 DEBUG OVERLAY");
   lines.push_back("F2 SETTINGS PANEL");
+  lines.push_back("F3 RENDER PROFILE");
   lines.push_back("1 SHADOWS  2 SOFT SHADOWS  3 REFLECTIONS");
   lines.push_back("4 ADAPTIVE  5 BVH  6 FILL MODE  T TEMPORAL");
-  lines.push_back("SPACE ALBEDO ONLY DEBUG");
+  lines.push_back("SPACE DEBUG VIEW");
   lines.push_back("[ ] SAMPLES PER CELL");
   lines.push_back("- = SOFT SHADOW SAMPLES OR BOUNCES");
 

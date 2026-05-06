@@ -8,11 +8,19 @@
 #include <cstddef>
 #include <vector>
 
+// Forward declaration для RayPacket и Scene
+namespace astraglyph {
+struct RayPacket;
+struct RayPacketHitInfo;
+class Scene;
+}
+
 namespace astraglyph {
 
 class RayTracer {
 public:
   void buildAcceleration(const std::vector<Triangle>& triangles, int leafSize = 4);
+  void buildAcceleration(const Scene& scene, int leafSize = 4);
 
   [[nodiscard]] HitInfo traceClosest(
       const Ray& ray,
@@ -40,10 +48,14 @@ private:
   [[nodiscard]] bool canUseAcceleration(
       const std::vector<Triangle>& triangles,
       const RenderSettings& settings) const noexcept;
+  [[nodiscard]] bool canUseAcceleration(
+      const Scene& scene,
+      const RenderSettings& settings) const noexcept;
 
   Bvh bvh_{};
   const Triangle* accelerationSource_{nullptr};
   std::size_t accelerationTriangleCount_{0};
+  std::size_t accelerationSceneVersion_{0};
   int accelerationLeafSize_{4};
   bool accelerationReady_{false};
 };

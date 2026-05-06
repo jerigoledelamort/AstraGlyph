@@ -13,6 +13,14 @@ enum class GlyphRampMode : std::uint8_t {
   Filled,
 };
 
+enum class DebugViewMode : std::uint8_t {
+  Off = 0,
+  Albedo,
+  Normals,
+  Depth,
+  Lighting,
+};
+
 struct RenderSettings {
   static constexpr std::uint32_t DirtyNone = 0U;
   static constexpr std::uint32_t DirtyPresentation = 1U << 0U;
@@ -41,6 +49,7 @@ struct RenderSettings {
   GlyphRampMode glyphRampMode{GlyphRampMode::Classic};
   bool showFps{true};
   bool showDebugInfo{true};
+  bool enableRenderProfiling{false};
 
   bool backfaceCulling{false};
   int bvhLeafSize{4};
@@ -52,6 +61,7 @@ struct RenderSettings {
 
   // Debug: output raw albedo texture (bypass lighting)
   bool debugAlbedoOnly{false};
+  DebugViewMode debugViewMode{DebugViewMode::Off};
 
   std::uint64_t settingsVersion{0};
   std::uint32_t dirtyFlags{DirtyAccumulation | DirtyPresentation | DirtyAcceleration};
@@ -95,6 +105,12 @@ struct RenderSettings {
   void toggleShowFps() noexcept
   {
     showFps = !showFps;
+    markChanged(DirtyPresentation);
+  }
+
+  void toggleRenderProfiling() noexcept
+  {
+    enableRenderProfiling = !enableRenderProfiling;
     markChanged(DirtyPresentation);
   }
 
@@ -184,6 +200,32 @@ struct RenderSettings {
     }
   }
 
+  [[nodiscard]] DebugViewMode activeDebugViewMode() const noexcept
+  {
+    return debugAlbedoOnly ? DebugViewMode::Albedo : debugViewMode;
+  }
+
+  [[nodiscard]] bool isDebugViewEnabled() const noexcept
+  {
+    return activeDebugViewMode() != DebugViewMode::Off;
+  }
+
+  [[nodiscard]] static std::string_view debugViewModeName(DebugViewMode mode) noexcept
+  {
+    switch (mode) {
+      case DebugViewMode::Albedo:
+        return "Albedo";
+      case DebugViewMode::Normals:
+        return "Normals";
+      case DebugViewMode::Depth:
+        return "Depth";
+      case DebugViewMode::Lighting:
+        return "Lighting";
+      default:
+        return "Off";
+    }
+  }
+
   void cycleGlyphRampMode() noexcept
   {
     glyphRampMode = (glyphRampMode == GlyphRampMode::Classic)
@@ -195,6 +237,29 @@ struct RenderSettings {
   void toggleDebugAlbedoOnly() noexcept
   {
     debugAlbedoOnly = !debugAlbedoOnly;
+    markChanged(DirtyAccumulation);
+  }
+
+  void cycleDebugViewMode() noexcept
+  {
+    debugAlbedoOnly = false;
+    switch (debugViewMode) {
+      case DebugViewMode::Off:
+        debugViewMode = DebugViewMode::Albedo;
+        break;
+      case DebugViewMode::Albedo:
+        debugViewMode = DebugViewMode::Normals;
+        break;
+      case DebugViewMode::Normals:
+        debugViewMode = DebugViewMode::Depth;
+        break;
+      case DebugViewMode::Depth:
+        debugViewMode = DebugViewMode::Lighting;
+        break;
+      case DebugViewMode::Lighting:
+        debugViewMode = DebugViewMode::Off;
+        break;
+    }
     markChanged(DirtyAccumulation);
   }
 

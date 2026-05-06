@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cctype>
 #include <cstddef>
 #include <iomanip>
@@ -79,6 +80,13 @@ constexpr int kLineSpacing = 2;
   return static_cast<int>(line.size()) * glyphAdvance - (kGlyphSpacing * scale);
 }
 
+[[nodiscard]] double elapsedMs(
+    std::chrono::high_resolution_clock::time_point start,
+    std::chrono::high_resolution_clock::time_point end) noexcept
+{
+  return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
 } // namespace
 
 Application::Application()
@@ -120,6 +128,31 @@ void Application::update(double dt)
 
 void Application::render()
 {
+  renderSceneToFramebuffer();
+
+  const std::vector<std::string> debugLines = debugOverlay_.buildLines(
+      renderSettings_,
+      renderer_.metrics(),
+      time_.fps(),
+      time_.deltaTime() * 1000.0,
+      renderer_.sceneTriangleCount(),
+      camera_.position());
+  const int overlayScale = std::max(2, std::min(window_.width() / 420, window_.height() / 240));
+  const int debugPanelHeight = debugLines.empty()
+                                   ? 0
+                                   : static_cast<int>(debugLines.size()) * ((kGlyphPixelHeight + kLineSpacing) * overlayScale) +
+                                         16 * overlayScale;
+
+  renderDebugOverlay(debugLines, overlayScale);
+  renderSettingsPanel(debugPanelHeight);
+
+  window_.present();
+}
+
+void Application::renderSceneToFramebuffer()
+{
+  const bool profilingEnabled = renderSettings_.enableRenderProfiling;
+  const auto frameStart = std::chrono::high_resolution_clock::now();
   renderSettings_.validate();
   renderer_.render(framebuffer_, camera_, scene_, renderSettings_);
   renderSettings_.clearDirtyState();
@@ -131,6 +164,7 @@ void Application::render()
   const int windowHeight = std::max(window_.height(), 1);
 
   window_.beginFrame(Vec3{0.02F, 0.02F, 0.03F});
+  const auto outputStart = std::chrono::high_resolution_clock::now();
 
   void* pixels = nullptr;
   int pitch = 0;
@@ -161,34 +195,33 @@ void Application::render()
 
     window_.unlockFramePixels();
   }
+  if (profilingEnabled) {
+    const auto outputEnd = std::chrono::high_resolution_clock::now();
+    renderer_.setPresentationProfiling(
+        elapsedMs(outputStart, outputEnd),
+        elapsedMs(frameStart, outputEnd));
+  }
+}
 
-  const std::vector<std::string> debugLines = debugOverlay_.buildLines(
-      renderSettings_,
-      renderer_.metrics(),
-      time_.fps(),
-      time_.deltaTime() * 1000.0,
-      renderer_.sceneTriangleCount(),
-      camera_.position());
+void Application::renderDebugOverlay(const std::vector<std::string>& debugLines, int overlayScale)
+{
+  (void)overlayScale;
   renderOverlayText(
       debugLines,
       16,
       16,
       Vec3{0.95F, 0.98F, 1.0F},
       Vec3{0.05F, 0.08F, 0.12F});
+}
 
-  const int overlayScale = std::max(2, std::min(window_.width() / 420, window_.height() / 240));
-  const int debugPanelHeight = debugLines.empty()
-                                   ? 0
-                                   : static_cast<int>(debugLines.size()) * ((kGlyphPixelHeight + kLineSpacing) * overlayScale) +
-                                         16 * overlayScale;
+void Application::renderSettingsPanel(int debugPanelHeight)
+{
   renderOverlayText(
       settingsPanel_.buildLines(renderSettings_),
       16,
       24 + debugPanelHeight,
       Vec3{1.0F, 0.96F, 0.90F},
       Vec3{0.10F, 0.07F, 0.05F});
-
-  window_.present();
 }
 
 void Application::handleRuntimeSettingsInput()
@@ -199,6 +232,9 @@ void Application::handleRuntimeSettingsInput()
   }
   if (input_.wasKeyPressed(Key::F2)) {
     settingsPanel_.setVisible(!settingsPanel_.isVisible());
+  }
+  if (input_.wasKeyPressed(Key::F3)) {
+    renderSettings_.toggleRenderProfiling();
   }
   if (input_.wasKeyPressed(Key::Digit1)) {
     renderSettings_.toggleShadows();
@@ -222,7 +258,7 @@ void Application::handleRuntimeSettingsInput()
     renderSettings_.toggleTemporalAccumulation();
   }
   if (input_.wasKeyPressed(Key::Space)) {
-    renderSettings_.debugAlbedoOnly = !renderSettings_.debugAlbedoOnly;
+    renderSettings_.cycleDebugViewMode();
   }
   if (input_.wasKeyPressed(Key::LeftBracket)) {
     renderSettings_.adjustSamplesPerCell(-1);

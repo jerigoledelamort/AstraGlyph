@@ -27,17 +27,19 @@ public:
   void waitAll();
 
   [[nodiscard]] std::size_t size() const noexcept;
+  [[nodiscard]] std::size_t threadCount() const noexcept;
 
 private:
-  void workerLoop();
+  void workerLoop(std::size_t workerId);
 
   std::vector<std::thread> workers_;
   std::queue<std::function<void()>> tasks_;
   std::mutex mutex_;
   std::condition_variable cv_;
   std::condition_variable doneCv_;
-  std::size_t activeTasks_ = 0;
-  bool stop_ = false;
+  std::atomic<std::size_t> activeTasks_{0};
+  std::atomic<bool> stop_{false};
+  std::size_t threadCount_{0};
 };
 
 } // namespace astraglyph
