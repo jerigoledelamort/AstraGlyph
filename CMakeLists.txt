@@ -70,6 +70,7 @@ set(ASTRAGLYPH_ENGINE_SOURCES
   src/geometry/MeshFactory.cpp
   src/geometry/ObjLoader.cpp
   src/render/Renderer.cpp
+  src/render/TemporalAccumulator.cpp
   src/render/AsciiMapper.cpp
   src/render/Sampler.cpp
   src/render/RayTracer.cpp

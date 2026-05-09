@@ -1,5 +1,7 @@
 #include "render/Sampler.hpp"
 
+#include "render/BlueNoiseData.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -209,6 +211,21 @@ Vec2 Sampler::sample2D(
   }
 }
 
+Sample Sampler::generateBlueNoiseSample(
+    int cellX,
+    int cellY,
+    int sampleIndex,
+    std::uint32_t frameIndex,
+    int gridWidth,
+    int gridHeight) const noexcept
+{
+  const int scaleX = std::max(gridWidth, 1);
+  const int scaleY = std::max(gridHeight, 1);
+  const int bx = ((cellX * 64) / scaleX + sampleIndex + static_cast<int>(frameIndex & 63U)) & 63;
+  const int by = ((cellY * 64) / scaleY + (sampleIndex >> 6) + static_cast<int>((frameIndex >> 6) & 63U)) & 63;
+  return {kBlueNoise[by][bx]};
+}
+
 Sample Sampler::generateSubCellSample(
     int cellX,
     int cellY,
@@ -217,6 +234,11 @@ Sample Sampler::generateSubCellSample(
 {
   if (sampleIndex <= 0 && settings.samplesPerCell <= 1) {
     return {};
+  }
+
+  if (settings.jitteredSampling) {
+    return generateBlueNoiseSample(
+        cellX, cellY, sampleIndex, settings.frameIndex, settings.gridWidth, settings.gridHeight);
   }
 
   const int maxSamples = clampSampleCount(std::max(settings.samplesPerCell, settings.maxSamplesPerCell));
@@ -229,7 +251,7 @@ Sample Sampler::generateSubCellSample(
       static_cast<std::uint32_t>(cellX),
       static_cast<std::uint32_t>(cellY),
       0U);
-  return {sample2D(seed, sampleIndex, requestedSamples, settings.jitteredSampling)};
+  return {sample2D(seed, sampleIndex, requestedSamples, false)};
 }
 
 } // namespace astraglyph

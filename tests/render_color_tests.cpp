@@ -39,6 +39,9 @@ int main() {
     RenderSettings settings;
     settings.gridWidth = 10;
     settings.gridHeight = 10;
+    settings.windowWidth = 10;
+    settings.windowHeight = 10;
+    settings.cellPixelSize = 1;
     settings.samplesPerCell = 1;
     settings.exposure = 1.0F;
     settings.gamma = 1.0F;

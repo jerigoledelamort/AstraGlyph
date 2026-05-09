@@ -29,6 +29,10 @@ struct RenderSettings {
 
   int gridWidth{160};
   int gridHeight{90};
+  int windowWidth{1280};
+  int windowHeight{720};
+  int cellPixelSize{8};
+  int resolutionIndex{1}; // 0=640x480, 1=1280x720, 2=1920x1080, 3=2560x1440
   int samplesPerCell{4};
   int maxSamplesPerCell{16};
   bool jitteredSampling{true};
@@ -40,6 +44,10 @@ struct RenderSettings {
   int shadowSamples{4};
   bool enableReflections{true};
   int maxBounces{2};
+  bool shapeAwareGlyphs{true};
+  bool enableRimLight{true};
+  float specularBoost{2.0f};
+  bool checkerboardSampling{true};
   bool enableBvh{true};
   bool enableMultithreading{true};
   int threadCount{0};
@@ -66,9 +74,29 @@ struct RenderSettings {
   std::uint64_t settingsVersion{0};
   std::uint32_t dirtyFlags{DirtyAccumulation | DirtyPresentation | DirtyAcceleration};
   bool accumulationDirty{true};
+  bool windowSizeDirty{false};
+
+  void updateGridFromWindowAndCell() noexcept
+  {
+    gridWidth = std::max(1, windowWidth / cellPixelSize);
+    gridHeight = std::max(1, windowHeight / cellPixelSize);
+  }
+
+  void applyResolutionIndex() noexcept
+  {
+    static constexpr int kResolutions[4][2] = {
+        {640, 480}, {1280, 720}, {1920, 1080}, {2560, 1440}};
+    int idx = std::clamp(resolutionIndex, 0, 3);
+    windowWidth = kResolutions[idx][0];
+    windowHeight = kResolutions[idx][1];
+    updateGridFromWindowAndCell();
+    windowSizeDirty = true;
+    markChanged(DirtyAccumulation | DirtyPresentation);
+  }
 
   void validate() noexcept
   {
+    updateGridFromWindowAndCell();
     gridWidth = std::clamp(gridWidth, 1, 320);
     gridHeight = std::clamp(gridHeight, 1, 180);
     samplesPerCell = std::clamp(samplesPerCell, 1, 16);
@@ -83,6 +111,7 @@ struct RenderSettings {
     ambientStrength = std::clamp(ambientStrength, 0.0F, 1.0F);
     shadowBias = std::clamp(shadowBias, 1.0e-5F, 0.1F);
     reflectionBias = std::clamp(reflectionBias, 1.0e-5F, 0.1F);
+    specularBoost = std::clamp(specularBoost, 0.0F, 10.0F);
   }
 
   void clearDirtyState() noexcept
@@ -266,10 +295,10 @@ struct RenderSettings {
   void resetToDefaults() noexcept
   {
     *this = RenderSettings{};
+    windowSizeDirty = true;
     markChanged(DirtyAccumulation | DirtyPresentation | DirtyAcceleration);
   }
 
-private:
   void markChanged(std::uint32_t flags) noexcept
   {
     validate();
@@ -279,6 +308,8 @@ private:
       accumulationDirty = true;
     }
   }
+
+private:
 };
 
 } // namespace astraglyph

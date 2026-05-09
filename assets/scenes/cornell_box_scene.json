@@ -1,0 +1,184 @@
+{
+  "camera": {
+    "position": [0.0, 0.0, 5.0],
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "fov": 60.0
+  },
+  "renderSettings": {
+    "gridWidth": 160,
+    "gridHeight": 90,
+    "samplesPerCell": 8,
+    "maxSamplesPerCell": 32,
+    "jitteredSampling": true,
+    "adaptiveSampling": true,
+    "adaptiveVarianceThreshold": 0.02,
+    "temporalAccumulation": true,
+    "enableShadows": true,
+    "enableSoftShadows": true,
+    "shadowSamples": 8,
+    "enableReflections": true,
+    "maxBounces": 3,
+    "enableBvh": true,
+    "enableMultithreading": true,
+    "threadCount": 0,
+    "exposure": 1.0,
+    "gamma": 2.2,
+    "colorOutput": true,
+    "glyphRampMode": "Classic",
+    "ambientStrength": 0.05,
+    "backgroundColor": [0.01, 0.01, 0.015]
+  },
+  "materials": [
+    {
+      "name": "white_wall",
+      "albedo": [0.9, 0.9, 0.9],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.0
+    },
+    {
+      "name": "red_wall",
+      "albedo": [0.9, 0.15, 0.15],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.0
+    },
+    {
+      "name": "green_wall",
+      "albedo": [0.15, 0.9, 0.15],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.0
+    },
+    {
+      "name": "metal_box",
+      "albedo": [0.95, 0.75, 0.35],
+      "roughness": 0.1,
+      "metallic": 1.0,
+      "reflectivity": 0.9,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.0
+    },
+    {
+      "name": "diffuse_sphere",
+      "albedo": [0.35, 0.55, 0.9],
+      "roughness": 0.95,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [0.0, 0.0, 0.0],
+      "emissionStrength": 0.0
+    },
+    {
+      "name": "light_emitter",
+      "albedo": [1.0, 1.0, 1.0],
+      "roughness": 1.0,
+      "metallic": 0.0,
+      "reflectivity": 0.0,
+      "emissionColor": [1.0, 0.95, 0.9],
+      "emissionStrength": 2.5
+    }
+  ],
+  "lights": [
+    {
+      "type": "area",
+      "position": [0.0, 1.95, 0.0],
+      "color": [1.0, 0.98, 0.95],
+      "intensity": 1.2,
+      "right": [1.0, 0.0, 0.0],
+      "up": [0.0, 0.0, 1.0],
+      "width": 1.5,
+      "height": 1.5
+    }
+  ],
+  "objects": [
+    {
+      "type": "cube",
+      "material": "white_wall",
+      "size": [4.0, 0.1, 4.0],
+      "transform": {
+        "position": [0.0, -2.05, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "white_wall",
+      "size": [4.0, 0.1, 4.0],
+      "transform": {
+        "position": [0.0, 2.05, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "white_wall",
+      "size": [4.0, 4.0, 0.1],
+      "transform": {
+        "position": [0.0, 0.0, -2.05],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "red_wall",
+      "size": [0.1, 4.0, 4.0],
+      "transform": {
+        "position": [-2.05, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "green_wall",
+      "size": [0.1, 4.0, 4.0],
+      "transform": {
+        "position": [2.05, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "metal_box",
+      "size": [0.9, 0.9, 0.9],
+      "transform": {
+        "position": [-0.7, -1.55, -0.5],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.4, 0.0]
+      }
+    },
+    {
+      "type": "sphere",
+      "material": "diffuse_sphere",
+      "radius": 0.6,
+      "segments": 32,
+      "rings": 16,
+      "transform": {
+        "position": [0.8, -1.4, 0.3],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    },
+    {
+      "type": "cube",
+      "material": "light_emitter",
+      "size": [1.5, 0.05, 1.5],
+      "transform": {
+        "position": [0.0, 1.98, 0.0],
+        "scale": [1.0, 1.0, 1.0],
+        "rotation": [0.0, 0.0, 0.0]
+      }
+    }
+  ]
+}

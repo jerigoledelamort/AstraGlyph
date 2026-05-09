@@ -142,6 +142,13 @@ void parseRenderSettings(RenderSettings& settings, const json& obj)
   if (obj.contains("debugAlbedoOnly")) {
     settings.debugAlbedoOnly = obj["debugAlbedoOnly"].get<bool>();
   }
+  // Backward compatibility: derive window size from grid if not explicitly set
+  if (!obj.contains("windowWidth")) {
+    settings.windowWidth = settings.gridWidth * settings.cellPixelSize;
+  }
+  if (!obj.contains("windowHeight")) {
+    settings.windowHeight = settings.gridHeight * settings.cellPixelSize;
+  }
   settings.validate();
 }
 

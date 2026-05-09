@@ -42,6 +42,7 @@ private:
     std::function<std::string()> getDynamicText;
     std::string hotkey;
     std::function<void(RenderSettings&)> action;
+    std::function<std::string(const RenderSettings&)> getDynamicTextWithSettings;
   };
 
   void drawGlyphString(Window& window,

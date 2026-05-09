@@ -93,7 +93,7 @@ Application::Application()
     : window_{1280, 720, "AstraGlyph / AsciiTracer"}, baseTitle_{"AstraGlyph / AsciiTracer"}
 {
   // Load samurai_girl scene (original with textures)
-  const auto result = SceneLoader::loadFromFile("assets/scenes/samurai_girl_scene.json");
+  const auto result = SceneLoader::loadFromFile("assets/scenes/cornell_box_scene.json");
   scene_ = std::move(result.scene);
   camera_ = result.camera;
   renderSettings_ = result.renderSettings;
@@ -123,6 +123,12 @@ int Application::run()
 void Application::update(double dt)
 {
   handleRuntimeSettingsInput();
+
+  if (renderSettings_.windowSizeDirty) {
+    window_.setSize(renderSettings_.windowWidth, renderSettings_.windowHeight);
+    renderSettings_.windowSizeDirty = false;
+  }
+
   camera_.setAspect(static_cast<float>(window_.width()) / static_cast<float>(window_.height()));
 
   currentPanelWidth_ = std::max(300, std::min(800, static_cast<int>(window_.width() * 0.25)));

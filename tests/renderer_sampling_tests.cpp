@@ -47,6 +47,9 @@ int main()
   RenderSettings settings;
   settings.gridWidth = 12;
   settings.gridHeight = 8;
+  settings.windowWidth = 12;
+  settings.windowHeight = 8;
+  settings.cellPixelSize = 1;
   settings.colorOutput = false;
   settings.samplesPerCell = 4;
   settings.maxSamplesPerCell = 8;

@@ -3,6 +3,7 @@
 #include "platform/Window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <iomanip>
 #include <sstream>
@@ -144,6 +145,29 @@ void UIPanel::buildFromSettings(const RenderSettings& /*settings*/)
   add({WidgetType::Button, "[ RESET ALL SETTINGS ]", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "",
        [](RenderSettings& s) { s.resetToDefaults(); }});
 
+  add({WidgetType::Label, "DISPLAY SETTINGS"});
+
+  add({WidgetType::Label, "", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "", nullptr,
+       [](const RenderSettings& s) {
+         return "RESOLUTION: " + std::to_string(s.windowWidth) + "x" + std::to_string(s.windowHeight);
+       }});
+
+  add({WidgetType::Button, "[ NEXT RESOLUTION ]", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "",
+       [](RenderSettings& s) {
+         s.resolutionIndex = (s.resolutionIndex + 1) % 4;
+         s.applyResolutionIndex();
+       }});
+
+  add({WidgetType::Slider, "CELL SIZE", 0, 0, nullptr, nullptr,
+       [](const RenderSettings& s) { return s.cellPixelSize; },
+       [](RenderSettings& s, int d) {
+         s.cellPixelSize = std::clamp(s.cellPixelSize + d, 4, 32);
+         s.updateGridFromWindowAndCell();
+         s.windowSizeDirty = true;
+         s.markChanged(RenderSettings::DirtyAccumulation | RenderSettings::DirtyPresentation);
+       },
+       4, 32, nullptr, ""});
+
   add({WidgetType::Label, "STATISTICS"});
 
   add({WidgetType::Label, "", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0,
@@ -258,6 +282,8 @@ void UIPanel::render(Window& window, int panelX, int panelY, int panelWidth, con
         std::string text = w.text;
         if (w.getDynamicText) {
           text = w.getDynamicText();
+        } else if (w.getDynamicTextWithSettings) {
+          text = w.getDynamicTextWithSettings(settings);
         }
         if (!text.empty()) {
           drawGlyphString(window, text, textX, textY, color);

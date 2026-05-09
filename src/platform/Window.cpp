@@ -258,6 +258,15 @@ std::uint32_t Window::windowId() const noexcept
   return SDL_GetWindowID(window_);
 }
 
+void Window::setSize(int width, int height)
+{
+  if (window_ != nullptr && width > 0 && height > 0) {
+    SDL_SetWindowSize(window_, width, height);
+    width_ = width;
+    height_ = height;
+  }
+}
+
 void Window::setFullscreen(bool fullscreen)
 {
   if (fullscreen_ == fullscreen) {

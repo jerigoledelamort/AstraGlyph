@@ -101,6 +101,8 @@ bool Renderer::requiresAccumulationReset(
          current.ambientStrength != previous.ambientStrength ||
          current.shadowBias != previous.shadowBias ||
          current.reflectionBias != previous.reflectionBias ||
+         current.enableRimLight != previous.enableRimLight ||
+         current.specularBoost != previous.specularBoost ||
          current.backgroundColor.x != previous.backgroundColor.x ||
          current.backgroundColor.y != previous.backgroundColor.y ||
          current.backgroundColor.z != previous.backgroundColor.z;
@@ -162,11 +164,13 @@ void Renderer::renderTile(
     const RenderSettings& settings,
     int yStart,
     int yEnd,
-    bool accumulationDirty,
+    bool accumulationValid,
     TileResult& result)
 {
   const int targetWidth = settings.gridWidth;
   const bool temporalOn = settings.temporalAccumulation;
+  const bool checkerboard = settings.checkerboardSampling && temporalOn && accumulationValid;
+  const int frameParity = static_cast<int>(settings.frameIndex) & 1;
   AsciiMapper mapper;
   Sampler sampler;
   const int baseSamples = clampConfiguredSamples(settings.samplesPerCell);
@@ -180,12 +184,27 @@ void Renderer::renderTile(
   // Локальные накопители для минимизации обращений к памяти
   for (int y = yStart; y < yEnd; ++y) {
     for (int x = 0; x < targetWidth; ++x) {
+      // Checkerboard: skip half the cells on even/odd frames
+      if (checkerboard && ((x + y + frameParity) & 1) != 0) {
+        // Keep old cell values; update frame count metric only
+        if (temporalOn) {
+          result.maxAccumulatedFrames = std::max(
+              result.maxAccumulatedFrames,
+              temporalAccumulator_.getAccumulatedFrames(x, y));
+        }
+        continue;
+      }
+      
       // Локальные переменные для лучшего использования кэша
-      Vec3 radianceSum{};
+      Vec3 directSum{};
+      Vec3 indirectSum{};
+      Vec3 specularSum{};
       Vec3 displaySum{};
+      Vec3 normalSum{};
       RunningVariance luminanceVariance{};
       double depthSum = 0.0;
       int depthSamples = 0;
+      int normalSamples = 0;
       int sampleCount = 0;
 
       // Pre-compute ray parameters для этого cell
@@ -206,12 +225,16 @@ void Renderer::renderTile(
             : mapper.applyExposureGamma(radiance, settings.exposure, settings.gamma);
         const float luminance = mapper.radianceToLuminance(display);
 
-        radianceSum += radiance;
+        directSum += hit.direct;
+        indirectSum += hit.indirect;
+        specularSum += hit.specular;
         displaySum += display;
         luminanceVariance.add(luminance);
         if (hit.hit) {
           depthSum += hit.t;
           ++depthSamples;
+          normalSum += hit.normal;
+          ++normalSamples;
         }
         ++sampleCount;
       };
@@ -237,7 +260,9 @@ void Renderer::renderTile(
       result.metrics.maxSamplesUsed = std::max(result.metrics.maxSamplesUsed, sampleCount);
 
       const float inverseSampleCount = 1.0F / static_cast<float>(sampleCount);
-      const Vec3 averageRadiance = radianceSum * inverseSampleCount;
+      const Vec3 averageDirect = directSum * inverseSampleCount;
+      const Vec3 averageIndirect = indirectSum * inverseSampleCount;
+      const Vec3 averageSpecular = specularSum * inverseSampleCount;
       const Vec3 averageDisplay = displaySum * inverseSampleCount;
       const float depth = depthSamples > 0
                               ? static_cast<float>(depthSum / static_cast<double>(depthSamples))
@@ -245,17 +270,23 @@ void Renderer::renderTile(
 
       AsciiCell& cell = framebuffer.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
 
+      if (normalSamples > 0) {
+        cell.normal = normalSum * (1.0F / static_cast<float>(normalSamples));
+      } else {
+        cell.normal = Vec3{0.0F, 0.0F, 0.0F};
+      }
+
       if (temporalOn) {
-        if (accumulationDirty) {
-          cell.accumulatedRadiance = averageRadiance;
-          cell.accumulatedFrames = 1;
-        } else {
-          cell.accumulatedRadiance += averageRadiance;
-          ++cell.accumulatedFrames;
+        Vec3 outputRadiance = temporalAccumulator_.accumulate(
+            x, y, averageDirect, averageIndirect, averageSpecular);
+        const int frameCount = temporalAccumulator_.getAccumulatedFrames(x, y);
+
+        // Specular boost after temporal accumulation
+        if (settings.specularBoost > 1.0f) {
+          const Vec3 specularAccum = temporalAccumulator_.getSpecularRadiance(x, y);
+          outputRadiance += specularAccum * (settings.specularBoost - 1.0f);
         }
 
-        const float invFrames = 1.0F / static_cast<float>(cell.accumulatedFrames);
-        const Vec3 outputRadiance = cell.accumulatedRadiance * invFrames;
         const Vec3 outputDisplay = settings.isDebugViewEnabled()
             ? outputRadiance
             : mapper.applyExposureGamma(outputRadiance, settings.exposure, settings.gamma);
@@ -268,14 +299,21 @@ void Renderer::renderTile(
         cell.bg = Vec3{};
         cell.depth = depth;
         cell.sampleCount = sampleCount;
+        cell.accumulatedRadiance = temporalAccumulator_.getAccumulatedRadiance(x, y);
+        cell.accumulatedFrames = frameCount;
         cell.accumulatedLuminance = outputLuminance;
-        result.maxAccumulatedFrames = std::max(result.maxAccumulatedFrames, cell.accumulatedFrames);
+
+        result.maxAccumulatedFrames = std::max(result.maxAccumulatedFrames, frameCount);
       } else {
+        Vec3 averageRadiance = averageDirect + averageIndirect + averageSpecular;
+        if (settings.specularBoost > 1.0f) {
+          averageRadiance += averageSpecular * (settings.specularBoost - 1.0f);
+        }
         const Vec3 displayForLuminance = settings.isDebugViewEnabled()
             ? averageRadiance
             : mapper.applyExposureGamma(averageRadiance, settings.exposure, settings.gamma);
         const float luminanceFromRadiance = mapper.radianceToLuminance(displayForLuminance);
-        
+
         cell.radiance = averageRadiance;
         cell.luminance = luminanceFromRadiance;
         cell.glyph = mapper.mapLuminanceToGlyph(luminanceFromRadiance, settings.glyphRampMode);
@@ -283,9 +321,6 @@ void Renderer::renderTile(
         cell.bg = Vec3{};
         cell.depth = depth;
         cell.sampleCount = sampleCount;
-        cell.accumulatedRadiance = Vec3{};
-        cell.accumulatedLuminance = 0.0F;
-        cell.accumulatedFrames = 0;
       }
     }
   }
@@ -323,10 +358,16 @@ void Renderer::render(
     accumulationDirty_ = true;
   }
 
+  temporalAccumulator_.resize(targetWidth, targetHeight);
+
   const bool temporalOn = activeSettings.temporalAccumulation;
   const bool accumulationValid = temporalOn && !accumulationDirty_;
   if (!accumulationValid) {
     framebuffer.clear();
+  }
+
+  if (accumulationDirty_) {
+    temporalAccumulator_.reset();
   }
 
   metrics_ = RenderMetrics{};
@@ -372,7 +413,7 @@ void Renderer::render(
 
   if (numThreads == 1 || targetHeight <= 1) {
     // Single-threaded fallback
-    renderTile(framebuffer, camera, scene, activeSettings, 0, targetHeight, accumulationDirty_, results[0]);
+    renderTile(framebuffer, camera, scene, activeSettings, 0, targetHeight, accumulationValid, results[0]);
   } else {
     // Вычисляем размер тайла для равномерного распределения нагрузки
     const int rowsPerTask = std::max((targetHeight + numThreads - 1) / numThreads, 1);
@@ -386,13 +427,13 @@ void Renderer::render(
         continue;
       }
       
-      const bool localAccumulationDirty = accumulationDirty_;
+      const bool localAccumulationValid = accumulationValid;
       threadPool_.enqueue([this, &framebuffer, &camera, &scene, &activeSettings,
-                          &results, yStart, yEnd, localAccumulationDirty]() {
+                          &results, yStart, yEnd, localAccumulationValid]() {
         for (int y = yStart; y < yEnd; ++y) {
           TileResult& result = results[static_cast<std::size_t>(y)];
           renderTile(framebuffer, camera, scene, activeSettings, y, y + 1, 
-                     localAccumulationDirty, result);
+                     localAccumulationValid, result);
         }
       });
     }
@@ -418,6 +459,23 @@ void Renderer::render(
   metrics_.accumulatedFrames = maxAccumulatedFrames;
   metrics_.threadCountUsed = numThreads;
   metrics_.enableMultithreading = activeSettings.enableMultithreading;
+
+  // Phase 3: contrast-aware glyph mapping + edge enhancement
+  if (activeSettings.shapeAwareGlyphs) {
+    AsciiMapper mapper;
+    for (int y = 0; y < targetHeight; ++y) {
+      for (int x = 0; x < targetWidth; ++x) {
+        AsciiCell& cell = framebuffer.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
+        float strength = 0.0F;
+        float direction = 0.0F;
+        AsciiMapper::computeGradient(framebuffer, x, y, strength, direction);
+        cell.glyph = mapper.mapShapeAwareGlyph(
+            cell.luminance, strength, direction, activeSettings.glyphRampMode);
+      }
+    }
+    AsciiMapper::enhanceEdges(framebuffer);
+  }
+
   if (activeSettings.enableRenderProfiling) {
     metrics_.totalRenderMs = elapsedMs(renderStart, std::chrono::high_resolution_clock::now());
   }

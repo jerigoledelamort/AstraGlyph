@@ -16,6 +16,7 @@ struct AsciiCell {
   Vec3 bg{0.0F, 0.0F, 0.0F};
   float luminance{0.0F};
   float depth{std::numeric_limits<float>::infinity()};
+  Vec3 normal{0.0F, 0.0F, 0.0F};
   Vec3 radiance{};
   int sampleCount{0};
 

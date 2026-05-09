@@ -14,6 +14,9 @@ int main()
   RenderSettings settings;
   settings.gridWidth = 80;
   settings.gridHeight = 45;
+  settings.windowWidth = 80;
+  settings.windowHeight = 45;
+  settings.cellPixelSize = 1;
   settings.colorOutput = false;
   settings.enableSoftShadows = false;
   settings.shadowSamples = 1;

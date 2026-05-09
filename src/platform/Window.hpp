@@ -44,6 +44,7 @@ public:
 
   [[nodiscard]] std::uint32_t windowId() const noexcept;
 
+  void setSize(int width, int height);
   void setFullscreen(bool fullscreen);
   [[nodiscard]] bool isFullscreen() const noexcept;
   void updateSize() noexcept;

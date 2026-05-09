@@ -167,18 +167,17 @@ Vec3 accumulateLocalLighting(
     const Scene& scene,
     const RayTracer& rayTracer,
     const RenderSettings& settings,
-    RenderMetrics& metrics) noexcept
+    RenderMetrics& metrics,
+    Vec3& outSpecular) noexcept
 {
   const Material& material = scene.materialFor(hit.materialId);
   const Vec3 normal = safeNormal(hit.normal);
-  // 🥇 4. СЭКОНОМЛЕНА TEXTURE SAMPLE: откладываем до проверки NdotL
   const Vec3 viewDirection = safeNormal(ray.origin - hit.position);
 
-  Vec3 result = Vec3{}; // 🥇 5. УБРАТЬ ЛИШНИЕ ОПЕРАЦИИ: начинаем с 0, добавим ambient позже
-
+  Vec3 diffuseResult = Vec3{};
+  Vec3 specularResult = Vec3{};
   const std::vector<Triangle>& triangles = scene.triangles();
-  
-  // 🥇 5. СЭКОНОМЛЕНА NORMALIZATION: нормаль уже нормализована в safeNormal выше
+
   for (const Light& light : scene.lights()) {
     const float intensity = std::clamp(light.intensity, 0.0F, 10.0F);
     if (intensity <= 0.0F) {
@@ -189,9 +188,7 @@ Vec3 accumulateLocalLighting(
     float lightTMax = std::numeric_limits<float>::infinity();
 
     if (light.type == LightType::Directional) {
-      // 🥇 5. СЭКОНОМЛЕНА NORMALIZATION: -direction должен быть нормализован
       lightDirection = -light.direction;
-      // Проверка на нормализованность (если не нормализован → нормализуем)
       const float dirLen = length(lightDirection);
       if (dirLen > 0.001F && dirLen < 0.99F) {
         lightDirection = lightDirection / dirLen;
@@ -206,15 +203,13 @@ Vec3 accumulateLocalLighting(
       lightTMax = std::max(safeShadowBias(settings), distanceToLight - safeShadowBias(settings));
     }
 
-    // 🥇 4. РАННИЙ ВЫХОД: проверяем NdotL ДО текстуры и теней
     const float NdotL = std::max(0.0F, dot(normal, lightDirection));
     if (NdotL <= 0.0F) {
-      continue; // 🔥 СЭКОНОМЛЕНО: не считаем текстуры, тени и specular для этого света
+      continue;
     }
 
     bool visible = true;
     if (settings.enableShadows) {
-      // 🥇 1. EARLY EXIT ДЛЯ ТЕНЕЙ: используем быстрый intersectAny
       const Ray shadowRay{
           hit.position + normal * safeShadowBias(settings),
           lightDirection,
@@ -225,31 +220,38 @@ Vec3 accumulateLocalLighting(
     }
 
     if (visible) {
-      // 🥇 4. ТЕПЕРЬ СЧИТАЕМ: только если свет виден и surface освещён
       const Vec3 albedo = sampleAlbedoTextureLinear(material, hit.uv);
       const float metallic = sampleMetallicTexture(material, hit.uv);
-      
-      result += albedo * 0.2F * (1.0F - metallic); // Ambient contribution
-      
+
+      diffuseResult += albedo * 0.2F * (1.0F - metallic); // Ambient
+
       const Vec3 lighting = light.color * intensity * NdotL;
-      const Vec3 diffuse = albedo * (1.0F - metallic) * lighting;
-      
-      // 🥈 2. УБРАТЬ POW: битовое возведение в степень вместо std::pow
+      diffuseResult += albedo * (1.0F - metallic) * lighting;
+
       const Vec3 halfDirection = safeNormal(lightDirection + viewDirection);
       const float NdotH = std::max(0.0F, dot(normal, halfDirection));
-      // NdotH^32 через битовые операции (быстрее чем pow)
-      float specFactor = NdotH * NdotH;      // ^2
-      specFactor *= specFactor;              // ^4
-      specFactor *= specFactor;              // ^8
-      specFactor *= specFactor;              // ^16
-      specFactor *= specFactor;              // ^32
-      
-      const Vec3 specular = light.color * specFactor * metallic;
-      result += diffuse + specular;
+      float specFactor = NdotH * NdotH;
+      specFactor *= specFactor;
+      specFactor *= specFactor;
+      specFactor *= specFactor;
+      specFactor *= specFactor;
+
+      specularResult += light.color * specFactor * metallic;
     }
   }
 
-  return result;
+  // Rim light: Fresnel-like edge glow
+  if (settings.enableRimLight) {
+    const float rim = 1.0F - std::abs(dot(normal, viewDirection));
+    const float rimStrength = rim * rim * rim * 0.5F;
+    const float metallic = sampleMetallicTexture(material, hit.uv);
+    for (const Light& light : scene.lights()) {
+      specularResult += light.color * rimStrength * metallic * light.intensity * 0.3F;
+    }
+  }
+
+  outSpecular = specularResult;
+  return diffuseResult;
 }
 
 [[nodiscard]] double elapsedMs(
@@ -356,39 +358,80 @@ Vec3 Integrator::traceRadiance(
 
   const std::vector<Triangle>& triangles = scene.triangles();
   const HitInfo hit = rayTracer.traceClosest(ray, triangles, settings, &metrics);
-  if (outHit != nullptr) {
-    *outHit = hit;
-  }
 
   const bool profilingEnabled = metrics.renderProfilingEnabled;
   std::chrono::high_resolution_clock::time_point shadingStart{};
   if (profilingEnabled) {
     shadingStart = std::chrono::high_resolution_clock::now();
   }
-  Vec3 result{};
+
+  Vec3 direct{};
+  Vec3 indirect{};
+  Vec3 specularLocal{};
+
   if (!hit.hit) {
-    result = settings.backgroundColor;
+    direct = settings.backgroundColor;
   } else {
     // 🥇 5. СЭКОНОМЛЕНА TEXTURE SAMPLE: не загружаем материал для debug mode пока
     const DebugViewMode debugMode = settings.activeDebugViewMode();
     if (debugMode != DebugViewMode::Off) {
       const Material& material = scene.materialFor(hit.materialId);
-      result = debugColor(ray, hit, material, scene, debugMode);
+      direct = debugColor(ray, hit, material, scene, debugMode);
     } else {
       // 🥇 4. ТЕКСТУРЫ СЧИТАЕМ ТОЛЬКО ЗДЕСЬ: внутри accumulateLocalLighting
-      result = accumulateLocalLighting(
+      direct = accumulateLocalLighting(
           ray,
           hit,
           scene,
           rayTracer,
           settings,
-          metrics);
+          metrics,
+          specularLocal);
+
+      // Emission is direct light
+      const Material& material = scene.materialFor(hit.materialId);
+      direct += material.emissionColor * material.emissionStrength;
+
+      // Indirect: reflections
+      const Vec3 reflectionNormal = faceForwardNormal(hit.normal, ray.direction);
+      const float metallic = sampleMetallicTexture(material, hit.uv);
+      const float roughness = sampleRoughnessTexture(material, hit.uv);
+      const float reflectivity = std::clamp(metallic * (1.0F - roughness * 0.5F), 0.0F, 1.0F);
+      const int maxBounces = std::max(settings.maxBounces, 0);
+      if (settings.enableReflections && reflectivity > 0.01F && depth < maxBounces) {
+        const float reflectionBias = safeReflectionBias(settings);
+        const Vec3 reflectedDirection = normalize(reflect(ray.direction, reflectionNormal));
+        ++metrics.reflectionRays;
+        const Ray reflectedRay{
+            hit.position + reflectionNormal * reflectionBias,
+            reflectedDirection,
+            reflectionBias,
+            std::numeric_limits<float>::infinity(),
+        };
+        HitInfo reflectedHit{};
+        const Vec3 reflectedRadiance = traceRadiance(
+            reflectedRay, scene, rayTracer, settings, metrics, &reflectedHit, depth + 1);
+        const Vec3 reflectionColor = lerp(
+            Vec3{1.0F, 1.0F, 1.0F},
+            sampleAlbedoTextureLinear(material, hit.uv),
+            1.0F - metallic);
+        indirect = reflectedRadiance * reflectionColor * reflectivity;
+      }
     }
   }
+
   if (profilingEnabled) {
     metrics.shadingMs += elapsedMs(shadingStart, std::chrono::high_resolution_clock::now());
   }
-  return result;
+
+  if (outHit != nullptr) {
+    *outHit = hit;
+    outHit->direct = direct;
+    outHit->indirect = indirect;
+    outHit->specular = specularLocal;
+  }
+
+  return direct + indirect + specularLocal;
 }
 
 Vec3 Integrator::radiance(const Scene& scene, const Ray& ray) const

@@ -17,6 +17,11 @@ struct HitInfo {
   Vec3 barycentric{};
   Vec2 uv{};
   int materialId{-1};
+  Vec3 direct{0.0f, 0.0f, 0.0f};
+  Vec3 indirect{0.0f, 0.0f, 0.0f};
+  Vec3 specular{0.0f, 0.0f, 0.0f};
+
+  [[nodiscard]] Vec3 radiance() const noexcept { return direct + indirect + specular; }
 };
 
 struct Triangle {

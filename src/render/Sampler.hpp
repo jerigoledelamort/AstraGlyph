@@ -29,6 +29,14 @@ public:
       int cellY,
       int sampleIndex,
       const RenderSettings& settings) const noexcept;
+
+  [[nodiscard]] Sample generateBlueNoiseSample(
+      int cellX,
+      int cellY,
+      int sampleIndex,
+      std::uint32_t frameIndex,
+      int gridWidth,
+      int gridHeight) const noexcept;
 };
 
 } // namespace astraglyph

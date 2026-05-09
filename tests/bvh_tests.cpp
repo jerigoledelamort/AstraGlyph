@@ -175,6 +175,9 @@ int main()
     RenderSettings bruteSettings;
     bruteSettings.gridWidth = 16;
     bruteSettings.gridHeight = 9;
+    bruteSettings.windowWidth = 16;
+    bruteSettings.windowHeight = 9;
+    bruteSettings.cellPixelSize = 1;
     bruteSettings.colorOutput = false;
     bruteSettings.samplesPerCell = 1;
     bruteSettings.maxSamplesPerCell = 1;
