@@ -85,6 +85,9 @@ bool tryMapKey(SDL_Keycode keycode, Key& outKey) noexcept
   case SDLK_F3:
     outKey = Key::F3;
     return true;
+  case SDLK_F:
+    outKey = Key::F;
+    return true;
   default:
     return false;
   }
@@ -99,6 +102,9 @@ void Input::beginFrame() noexcept
   std::fill(mouseButtonPressed_.begin(), mouseButtonPressed_.end(), false);
   std::fill(mouseButtonReleased_.begin(), mouseButtonReleased_.end(), false);
   mouseDelta_ = Vec2{};
+  mouseState_.wheelDelta = 0;
+  mouseState_.deltaX = 0;
+  mouseState_.deltaY = 0;
 }
 
 void Input::pollEvents(Window& window)
@@ -138,17 +144,38 @@ void Input::processEvent(const ::SDL_Event& event, Window& window)
   }
 
   if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+    const bool down = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
     if (event.button.button == SDL_BUTTON_LEFT) {
-      const bool down = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
       setMouseButtonState(MouseButton::Left, down);
-      setMouseCaptured(window, down);
+      mouseState_.leftButton = down;
+    } else if (event.button.button == SDL_BUTTON_RIGHT) {
+      setMouseButtonState(MouseButton::Right, down);
+      mouseState_.rightButton = down;
+    } else if (event.button.button == SDL_BUTTON_MIDDLE) {
+      mouseState_.middleButton = down;
     }
     return;
   }
 
-  if (event.type == SDL_EVENT_MOUSE_MOTION && mouseCaptured_) {
-    mouseDelta_.x += event.motion.xrel;
-    mouseDelta_.y += event.motion.yrel;
+  if (event.type == SDL_EVENT_MOUSE_MOTION) {
+    mouseState_.x = event.motion.x;
+    mouseState_.y = event.motion.y;
+    mouseState_.deltaX = event.motion.xrel;
+    mouseState_.deltaY = event.motion.yrel;
+    
+    if (mouseCaptured_) {
+      mouseDelta_.x += event.motion.xrel;
+      mouseDelta_.y += event.motion.yrel;
+    }
+    
+    prevMouseX_ = mouseState_.x;
+    prevMouseY_ = mouseState_.y;
+    return;
+  }
+
+  if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+    mouseState_.wheelDelta = event.wheel.y;
+    return;
   }
 }
 
@@ -179,6 +206,9 @@ bool Input::wasMouseButtonReleased(MouseButton button) const noexcept
 
 Vec2 Input::mouseDelta() const noexcept
 {
+  if (mouseInPanel_) {
+    return Vec2{};
+  }
   return mouseDelta_;
 }
 
@@ -217,6 +247,23 @@ void Input::setMouseButtonState(MouseButton button, bool down) noexcept
   }
 }
 
+void Input::applyMouseCapture(Window& window) noexcept
+{
+  if (mouseInPanel_) {
+    if (mouseCaptured_) {
+      setMouseCaptured(window, false);
+    }
+    return;
+  }
+
+  const bool leftDown = mouseButtonDown_[mouseButtonIndex(MouseButton::Left)];
+  if (leftDown && !mouseCaptured_) {
+    setMouseCaptured(window, true);
+  } else if (!leftDown && mouseCaptured_) {
+    setMouseCaptured(window, false);
+  }
+}
+
 void Input::setMouseCaptured(Window& window, bool captured) noexcept
 {
   if (mouseCaptured_ == captured) {
@@ -229,6 +276,21 @@ void Input::setMouseCaptured(Window& window, bool captured) noexcept
 
   mouseCaptured_ = captured;
   mouseDelta_ = Vec2{};
+}
+
+MouseState Input::mouseState() const noexcept
+{
+  MouseState ms = mouseState_;
+  if (mouseInPanel_) {
+    ms.deltaX = 0;
+    ms.deltaY = 0;
+  }
+  return ms;
+}
+
+void Input::setMouseInPanel(bool inPanel) noexcept
+{
+  mouseInPanel_ = inPanel;
 }
 
 } // namespace astraglyph

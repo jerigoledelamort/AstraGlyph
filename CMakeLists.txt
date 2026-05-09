@@ -40,7 +40,9 @@ else()
     add_compile_definitions(ASTRAGLYPH_ENABLE_SIMD)
     add_compile_options($<$<CONFIG:Release>:/arch:AVX2>)
   else()
-    add_compile_options($<$<CONFIG:Release>:/O2 /fp:fast /arch:AVX2>)
+    add_compile_options($<$<CONFIG:Release>:/O2>)
+    add_compile_options($<$<CONFIG:Release>:/fp:fast>)
+    add_compile_options($<$<CONFIG:Release>:/arch:AVX2>)
   endif()
 endif()
 
@@ -81,6 +83,7 @@ set(ASTRAGLYPH_ENGINE_SOURCES
   src/render/SimdTriangleSoASse3.cpp
   src/ui/DebugOverlay.cpp
   src/ui/SettingsPanel.cpp
+  src/ui/UIPanel.cpp
 )
 
 add_library(astraglyph_engine STATIC ${ASTRAGLYPH_ENGINE_SOURCES})

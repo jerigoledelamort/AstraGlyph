@@ -99,12 +99,13 @@ Application::Application()
   renderSettings_ = result.renderSettings;
 
   camera_.setAspect(static_cast<float>(window_.width()) / static_cast<float>(window_.height()));
-  debugOverlay_.setVisible(renderSettings_.showDebugInfo);
+  uiPanel_.buildFromSettings(renderSettings_);
 }
 
 int Application::run()
 {
   while (!window_.shouldClose()) {
+    window_.updateSize();
     time_.update();
     input_.beginFrame();
     input_.pollEvents(window_);
@@ -123,6 +124,26 @@ void Application::update(double dt)
 {
   handleRuntimeSettingsInput();
   camera_.setAspect(static_cast<float>(window_.width()) / static_cast<float>(window_.height()));
+
+  currentPanelWidth_ = std::max(300, std::min(800, static_cast<int>(window_.width() * 0.25)));
+
+  const MouseState ms = input_.mouseState();
+  input_.setMouseInPanel(panelVisible_ && ms.x >= viewportWidth());
+  input_.applyMouseCapture(window_);
+  
+  if (panelVisible_ && ms.x >= viewportWidth()) {
+    const int localX = ms.x - (window_.width() - currentPanelWidth_);
+    if (input_.wasMouseButtonPressed(MouseButton::Left)) {
+      uiPanel_.handleMouseClick(localX, ms.y, renderSettings_, 1);
+    }
+    if (input_.wasMouseButtonPressed(MouseButton::Right)) {
+      uiPanel_.handleMouseClick(localX, ms.y, renderSettings_, -1);
+    }
+    if (ms.wheelDelta != 0) {
+      uiPanel_.handleMouseWheel(ms.wheelDelta);
+    }
+  }
+
   camera_.updateFromInput(input_, static_cast<float>(dt));
 }
 
@@ -130,21 +151,15 @@ void Application::render()
 {
   renderSceneToFramebuffer();
 
-  const std::vector<std::string> debugLines = debugOverlay_.buildLines(
-      renderSettings_,
-      renderer_.metrics(),
-      time_.fps(),
-      time_.deltaTime() * 1000.0,
-      renderer_.sceneTriangleCount(),
-      camera_.position());
-  const int overlayScale = std::max(2, std::min(window_.width() / 420, window_.height() / 240));
-  const int debugPanelHeight = debugLines.empty()
-                                   ? 0
-                                   : static_cast<int>(debugLines.size()) * ((kGlyphPixelHeight + kLineSpacing) * overlayScale) +
-                                         16 * overlayScale;
-
-  renderDebugOverlay(debugLines, overlayScale);
-  renderSettingsPanel(debugPanelHeight);
+  if (panelVisible_) {
+    uiPanel_.updateFromSettings(
+        renderSettings_,
+        renderer_.metrics(),
+        time_.fps(),
+        static_cast<int>(renderer_.sceneTriangleCount()),
+        camera_.position());
+    uiPanel_.render(window_, window_.width() - currentPanelWidth_, 0, currentPanelWidth_, renderSettings_);
+  }
 
   window_.present();
 }
@@ -203,35 +218,13 @@ void Application::renderSceneToFramebuffer()
   }
 }
 
-void Application::renderDebugOverlay(const std::vector<std::string>& debugLines, int overlayScale)
-{
-  (void)overlayScale;
-  renderOverlayText(
-      debugLines,
-      16,
-      16,
-      Vec3{0.95F, 0.98F, 1.0F},
-      Vec3{0.05F, 0.08F, 0.12F});
-}
-
-void Application::renderSettingsPanel(int debugPanelHeight)
-{
-  renderOverlayText(
-      settingsPanel_.buildLines(renderSettings_),
-      16,
-      24 + debugPanelHeight,
-      Vec3{1.0F, 0.96F, 0.90F},
-      Vec3{0.10F, 0.07F, 0.05F});
-}
-
 void Application::handleRuntimeSettingsInput()
 {
   if (input_.wasKeyPressed(Key::F1)) {
-    renderSettings_.toggleShowDebugInfo();
-    debugOverlay_.setVisible(renderSettings_.showDebugInfo);
+    panelVisible_ = !panelVisible_;
   }
-  if (input_.wasKeyPressed(Key::F2)) {
-    settingsPanel_.setVisible(!settingsPanel_.isVisible());
+  if (input_.wasKeyPressed(Key::F)) {
+    window_.setFullscreen(!window_.isFullscreen());
   }
   if (input_.wasKeyPressed(Key::F3)) {
     renderSettings_.toggleRenderProfiling();
@@ -416,7 +409,8 @@ void Application::renderOverlayText(
     int originX,
     int originY,
     const Vec3& textColor,
-    const Vec3& backgroundColor)
+    const Vec3& backgroundColor,
+    int fixedWidth)
 {
   if (lines.empty()) {
     return;
@@ -431,7 +425,7 @@ void Application::renderOverlayText(
   }
 
   const int panelPadding = 8 * scale;
-  const int panelWidth = maxWidth + panelPadding * 2;
+  const int panelWidth = fixedWidth > 0 ? fixedWidth : maxWidth + panelPadding * 2;
   const int panelHeight = static_cast<int>(lines.size()) * lineAdvance - (kLineSpacing * scale) + panelPadding * 2;
   window_.drawFilledRect(originX, originY, panelWidth, panelHeight, backgroundColor);
 
@@ -459,6 +453,11 @@ void Application::renderOverlayText(
     }
     y += lineAdvance;
   }
+}
+
+int Application::viewportWidth() const noexcept
+{
+  return std::max(1, window_.width() - (panelVisible_ ? currentPanelWidth_ : 0));
 }
 
 } // namespace astraglyph

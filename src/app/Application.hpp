@@ -9,8 +9,7 @@
 #include "scene/Camera.hpp"
 #include "scene/Scene.hpp"
 #include "scene/SceneLoader.hpp"
-#include "ui/DebugOverlay.hpp"
-#include "ui/SettingsPanel.hpp"
+#include "ui/UIPanel.hpp"
 
 #include <string>
 #include <vector>
@@ -28,8 +27,6 @@ private:
   void handleRuntimeSettingsInput();
   void updateWindowTitle();
   void renderSceneToFramebuffer();
-  void renderDebugOverlay(const std::vector<std::string>& debugLines, int overlayScale);
-  void renderSettingsPanel(int debugPanelHeight);
   void renderGlyph(
       char glyph,
       int x,
@@ -56,7 +53,9 @@ private:
       int originX,
       int originY,
       const Vec3& textColor,
-      const Vec3& backgroundColor);
+      const Vec3& backgroundColor,
+      int fixedWidth = 0);
+  [[nodiscard]] int viewportWidth() const noexcept;
 
   Window window_;
   Input input_{};
@@ -64,12 +63,13 @@ private:
   Camera camera_{};
   Renderer renderer_{};
   RenderSettings renderSettings_{};
-  DebugOverlay debugOverlay_{};
-  SettingsPanel settingsPanel_{};
+  UIPanel uiPanel_{};
   AsciiFramebuffer framebuffer_{};
   Scene scene_{};
   std::string baseTitle_{};
   int titleUpdateCounter_ = 0;
+  bool panelVisible_{true};
+  int currentPanelWidth_ = 800;
 };
 
 } // namespace astraglyph

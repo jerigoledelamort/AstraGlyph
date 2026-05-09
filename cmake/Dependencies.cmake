@@ -284,13 +284,63 @@ function(astraglyph_find_dependencies)
     find_package(SDL3 CONFIG REQUIRED PATHS "${local_sdl3_prefix}" NO_DEFAULT_PATH)
   endif()
 
+  # Resolve actual SDL3 static library filename (MSVC -> SDL3.lib, MinGW -> libSDL3.a)
+  if(EXISTS "${local_sdl3_prefix}/lib/SDL3.lib")
+    set(_astraglyph_sdl3_lib "${local_sdl3_prefix}/lib/SDL3.lib")
+  elseif(EXISTS "${local_sdl3_prefix}/lib/libSDL3.a")
+    set(_astraglyph_sdl3_lib "${local_sdl3_prefix}/lib/libSDL3.a")
+  else()
+    message(FATAL_ERROR "SDL3 static library not found in ${local_sdl3_prefix}/lib")
+  endif()
+
   if(TARGET SDL3::SDL3)
-    set(ASTRAGLYPH_SDL3_TARGET SDL3::SDL3 PARENT_SCOPE)
+    # On Windows, SDL3 static target may incorrectly link to Unix 'm' library
+    # Create a wrapper target to avoid this issue
+    if(WIN32)
+      if(TARGET SDL3::SDL3-static)
+        add_library(astraglyph_sdl3_wrapper INTERFACE IMPORTED)
+        # Use known SDL3 include path for Windows
+        target_include_directories(astraglyph_sdl3_wrapper INTERFACE 
+          "${local_sdl3_prefix}/include"
+        )
+        # Link to SDL3-static library file directly without inherited link deps
+        target_link_libraries(astraglyph_sdl3_wrapper INTERFACE
+          ${_astraglyph_sdl3_lib}
+          winmm
+          setupapi
+          imm32
+          version
+        )
+        set(ASTRAGLYPH_SDL3_TARGET astraglyph_sdl3_wrapper PARENT_SCOPE)
+      else()
+        set(ASTRAGLYPH_SDL3_TARGET SDL3::SDL3 PARENT_SCOPE)
+      endif()
+    else()
+      set(ASTRAGLYPH_SDL3_TARGET SDL3::SDL3 PARENT_SCOPE)
+    endif()
     return()
   endif()
 
   if(TARGET SDL3::SDL3-static)
-    set(ASTRAGLYPH_SDL3_TARGET SDL3::SDL3-static PARENT_SCOPE)
+    # On Windows, SDL3 static target may incorrectly link to Unix 'm' library
+    if(WIN32)
+      add_library(astraglyph_sdl3_wrapper INTERFACE IMPORTED)
+      # Use known SDL3 include path for Windows
+      target_include_directories(astraglyph_sdl3_wrapper INTERFACE 
+        "${local_sdl3_prefix}/include"
+      )
+      # Link to SDL3-static library file directly without inherited link deps
+      target_link_libraries(astraglyph_sdl3_wrapper INTERFACE
+        ${_astraglyph_sdl3_lib}
+        winmm
+        setupapi
+        imm32
+        version
+      )
+      set(ASTRAGLYPH_SDL3_TARGET astraglyph_sdl3_wrapper PARENT_SCOPE)
+    else()
+      set(ASTRAGLYPH_SDL3_TARGET SDL3::SDL3-static PARENT_SCOPE)
+    endif()
     return()
   endif()
 

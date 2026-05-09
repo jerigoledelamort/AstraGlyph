@@ -11,6 +11,17 @@ namespace astraglyph {
 
 class Window;
 
+struct MouseState {
+  int x{0};
+  int y{0};
+  int deltaX{0};
+  int deltaY{0};
+  bool leftButton{false};
+  bool rightButton{false};
+  bool middleButton{false};
+  int wheelDelta{0};
+};
+
 enum class Key : std::size_t {
   W = 0,
   A,
@@ -34,11 +45,14 @@ enum class Key : std::size_t {
   F1,
   F2,
   F3,
+  F,
   Count
 };
 
 enum class MouseButton : std::size_t {
   Left = 0,
+  Right,
+  Middle,
   Count
 };
 
@@ -59,6 +73,10 @@ public:
 
   [[nodiscard]] virtual Vec2 mouseDelta() const noexcept;
   [[nodiscard]] virtual bool isMouseCaptured() const noexcept;
+
+  [[nodiscard]] MouseState mouseState() const noexcept;
+  void setMouseInPanel(bool inPanel) noexcept;
+  void applyMouseCapture(Window& window) noexcept;
 
 private:
   static constexpr std::size_t KeyCount = static_cast<std::size_t>(Key::Count);
@@ -88,6 +106,11 @@ private:
 
   Vec2 mouseDelta_{};
   bool mouseCaptured_{false};
+
+  MouseState mouseState_{};
+  int prevMouseX_{0};
+  int prevMouseY_{0};
+  bool mouseInPanel_{false};
 };
 
 } // namespace astraglyph

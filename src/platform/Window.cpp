@@ -15,9 +15,7 @@ namespace {
 std::mutex gSdlMutex;
 std::size_t gSdlRefCount = 0;
 
-} // namespace
-
-void Window::acquireSdl()
+void acquireSdl()
 {
   const std::scoped_lock lock{gSdlMutex};
   if (gSdlRefCount == 0U) {
@@ -28,7 +26,7 @@ void Window::acquireSdl()
   ++gSdlRefCount;
 }
 
-void Window::releaseSdl() noexcept
+void releaseSdl() noexcept
 {
   const std::scoped_lock lock{gSdlMutex};
   if (gSdlRefCount == 0U) {
@@ -40,6 +38,8 @@ void Window::releaseSdl() noexcept
     SDL_Quit();
   }
 }
+
+} // namespace
 
 Window::Window(int width, int height, std::string title)
     : width_{width}, height_{height}, title_{std::move(title)}
@@ -65,6 +65,11 @@ Window::Window(int width, int height, std::string title)
     sdlOwned_ = false;
     throw std::runtime_error("SDL_CreateRenderer failed: " + std::string{SDL_GetError()});
   }
+
+  // Сохраняем начальные размеры и позицию окна
+  windowedWidth_ = width_;
+  windowedHeight_ = height_;
+  SDL_GetWindowPosition(window_, &windowedPosX_, &windowedPosY_);
 }
 
 Window::~Window()
@@ -251,6 +256,47 @@ std::uint32_t Window::windowId() const noexcept
     return 0U;
   }
   return SDL_GetWindowID(window_);
+}
+
+void Window::setFullscreen(bool fullscreen)
+{
+  if (fullscreen_ == fullscreen) {
+    return;
+  }
+
+  if (fullscreen) {
+    // Запоминаем текущие размеры и позицию перед переходом в fullscreen
+    SDL_GetWindowSize(window_, &windowedWidth_, &windowedHeight_);
+    SDL_GetWindowPosition(window_, &windowedPosX_, &windowedPosY_);
+    
+    if (!SDL_SetWindowFullscreen(window_, true)) {
+      // Ошибка переключения - оставляем флаг как был
+      return;
+    }
+  } else {
+    // Восстанавливаем размеры и позицию из оконного режима
+    if (!SDL_SetWindowFullscreen(window_, false)) {
+      // Ошибка переключения - оставляем флаг как был
+      return;
+    }
+    SDL_SetWindowPosition(window_, windowedPosX_, windowedPosY_);
+    SDL_SetWindowSize(window_, windowedWidth_, windowedHeight_);
+  }
+
+  fullscreen_ = fullscreen;
+  updateSize();
+}
+
+bool Window::isFullscreen() const noexcept
+{
+  return fullscreen_;
+}
+
+void Window::updateSize() noexcept
+{
+  if (window_ != nullptr) {
+    SDL_GetWindowSize(window_, &width_, &height_);
+  }
 }
 
 void Window::destroy() noexcept
