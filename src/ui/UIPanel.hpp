@@ -23,9 +23,10 @@ public:
   void render(Window& window, int panelX, int panelY, int panelWidth, const RenderSettings& settings);
   void handleMouseClick(int mouseX, int mouseY, RenderSettings& settings, int direction);
   void handleMouseWheel(int delta);
+  void setHovered(int mouseX, int mouseY);
 
 private:
-  enum class WidgetType { Label, Checkbox, Slider };
+  enum class WidgetType { Label, Checkbox, Slider, Button };
 
   struct Widget {
     WidgetType type;
@@ -39,6 +40,8 @@ private:
     int minVal = 0;
     int maxVal = 0;
     std::function<std::string()> getDynamicText;
+    std::string hotkey;
+    std::function<void(RenderSettings&)> action;
   };
 
   void drawGlyphString(Window& window,
@@ -56,11 +59,13 @@ private:
   static constexpr int kPadding = 12;
   static constexpr int kLineHeight = (kGlyphPixelHeight + kLineSpacing) * kScale;
   static constexpr int kWidgetHeight = kLineHeight + 6;
+  static constexpr int kScrollbarWidth = 8;
 
   int scrollOffset_ = 0;
   int panelWidth_ = 0;
   int panelHeight_ = 0;
   int totalContentHeight_ = 0;
+  int hoveredWidgetIndex_ = -1;
 
   double fps_ = 0.0;
   int triangleCount_ = 0;

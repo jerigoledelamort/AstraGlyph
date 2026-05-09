@@ -263,6 +263,12 @@ struct RenderSettings {
     markChanged(DirtyAccumulation);
   }
 
+  void resetToDefaults() noexcept
+  {
+    *this = RenderSettings{};
+    markChanged(DirtyAccumulation | DirtyPresentation | DirtyAcceleration);
+  }
+
 private:
   void markChanged(std::uint32_t flags) noexcept
   {

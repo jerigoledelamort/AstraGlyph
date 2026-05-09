@@ -82,64 +82,67 @@ void UIPanel::buildFromSettings(const RenderSettings& /*settings*/)
 
   add({WidgetType::Label, "RENDER SETTINGS"});
 
-  add({WidgetType::Checkbox, "SHADOWS", 0, 0,
-       [](const RenderSettings& s) { return s.enableShadows; },
-       [](RenderSettings& s) { s.toggleShadows(); }});
+  add({WidgetType::Checkbox, "SHADOWS", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(1)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.enableShadows; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleShadows(); };
 
-  add({WidgetType::Checkbox, "SOFT SHADOWS", 0, 0,
-       [](const RenderSettings& s) { return s.enableSoftShadows; },
-       [](RenderSettings& s) { s.toggleSoftShadows(); }});
+  add({WidgetType::Checkbox, "SOFT SHADOWS", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(2)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.enableSoftShadows; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleSoftShadows(); };
 
   add({WidgetType::Slider, "SHADOW SAMPLES", 0, 0, nullptr, nullptr,
        [](const RenderSettings& s) { return s.shadowSamples; },
        [](RenderSettings& s, int d) { s.adjustShadowSamples(d); },
-       1, 16});
+       1, 16, nullptr, "(- =)"});
 
-  add({WidgetType::Checkbox, "REFLECTIONS", 0, 0,
-       [](const RenderSettings& s) { return s.enableReflections; },
-       [](RenderSettings& s) { s.toggleReflections(); }});
+  add({WidgetType::Checkbox, "REFLECTIONS", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(3)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.enableReflections; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleReflections(); };
 
   add({WidgetType::Slider, "MAX BOUNCES", 0, 0, nullptr, nullptr,
        [](const RenderSettings& s) { return s.maxBounces; },
        [](RenderSettings& s, int d) { s.adjustMaxBounces(d); },
-       0, 8});
+       0, 8, nullptr, "(- =)"});
 
-  add({WidgetType::Checkbox, "BVH", 0, 0,
-       [](const RenderSettings& s) { return s.enableBvh; },
-       [](RenderSettings& s) { s.toggleBvh(); }});
+  add({WidgetType::Checkbox, "BVH", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(5)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.enableBvh; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleBvh(); };
 
-  add({WidgetType::Checkbox, "ADAPTIVE SAMPLING", 0, 0,
-       [](const RenderSettings& s) { return s.adaptiveSampling; },
-       [](RenderSettings& s) { s.toggleAdaptiveSampling(); }});
+  add({WidgetType::Checkbox, "ADAPTIVE SAMPLING", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(4)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.adaptiveSampling; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleAdaptiveSampling(); };
 
-  add({WidgetType::Checkbox, "TEMPORAL ACCUMULATION", 0, 0,
-       [](const RenderSettings& s) { return s.temporalAccumulation; },
-       [](RenderSettings& s) { s.toggleTemporalAccumulation(); }});
+  add({WidgetType::Checkbox, "TEMPORAL ACCUMULATION", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(T)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.temporalAccumulation; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleTemporalAccumulation(); };
 
   add({WidgetType::Slider, "SAMPLES PER CELL", 0, 0, nullptr, nullptr,
        [](const RenderSettings& s) { return s.samplesPerCell; },
        [](RenderSettings& s, int d) { s.adjustSamplesPerCell(d); },
-       1, 16});
+       1, 16, nullptr, "([ ])"});
 
-  add({WidgetType::Checkbox, "MULTITHREADING", 0, 0,
-       [](const RenderSettings& s) { return s.enableMultithreading; },
-       [](RenderSettings& s) { s.enableMultithreading = !s.enableMultithreading; }});
+  add({WidgetType::Checkbox, "MULTITHREADING", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.enableMultithreading; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.enableMultithreading = !s.enableMultithreading; };
 
-  add({WidgetType::Checkbox, "COLOR OUTPUT", 0, 0,
-       [](const RenderSettings& s) { return s.colorOutput; },
-       [](RenderSettings& s) { s.colorOutput = !s.colorOutput; }});
+  add({WidgetType::Checkbox, "COLOR OUTPUT", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.colorOutput; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.colorOutput = !s.colorOutput; };
 
-  add({WidgetType::Checkbox, "SHOW FPS", 0, 0,
-       [](const RenderSettings& s) { return s.showFps; },
-       [](RenderSettings& s) { s.toggleShowFps(); }});
+  add({WidgetType::Checkbox, "SHOW FPS", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.showFps; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleShowFps(); };
 
-  add({WidgetType::Checkbox, "SHOW DEBUG INFO", 0, 0,
-       [](const RenderSettings& s) { return s.showDebugInfo; },
-       [](RenderSettings& s) { s.toggleShowDebugInfo(); }});
+  add({WidgetType::Checkbox, "SHOW DEBUG INFO", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(SPACE)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.showDebugInfo; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleShowDebugInfo(); };
 
-  add({WidgetType::Checkbox, "RENDER PROFILING", 0, 0,
-       [](const RenderSettings& s) { return s.enableRenderProfiling; },
-       [](RenderSettings& s) { s.toggleRenderProfiling(); }});
+  add({WidgetType::Checkbox, "RENDER PROFILING", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "(F3)", nullptr});
+  widgets_.back().getBool = [](const RenderSettings& s) { return s.enableRenderProfiling; };
+  widgets_.back().toggle = [](RenderSettings& s) { s.toggleRenderProfiling(); };
+
+  add({WidgetType::Button, "[ RESET ALL SETTINGS ]", 0, 0, nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, "",
+       [](RenderSettings& s) { s.resetToDefaults(); }});
 
   add({WidgetType::Label, "STATISTICS"});
 
@@ -219,7 +222,21 @@ void UIPanel::render(Window& window, int panelX, int panelY, int panelWidth, con
   window.drawFilledRect(panelX, panelY, 2, panelHeight_, borderColor);
   window.drawFilledRect(panelX + panelWidth_ - 2, panelY, 2, panelHeight_, borderColor);
 
-  for (const auto& w : widgets_) {
+  // Scrollbar
+  if (totalContentHeight_ > panelHeight_) {
+    const int scrollbarX = panelX + panelWidth_ - kScrollbarWidth - 4;
+    const int scrollbarY = panelY;
+    const int scrollbarH = panelHeight_;
+    window.drawFilledRect(scrollbarX, scrollbarY, kScrollbarWidth, scrollbarH, Vec3{0.05F, 0.05F, 0.07F});
+
+    const int thumbHeight = std::max(8, panelHeight_ * panelHeight_ / totalContentHeight_);
+    const int maxScroll = std::max(1, totalContentHeight_ - panelHeight_);
+    const int thumbY = scrollbarY + (scrollOffset_ * (scrollbarH - thumbHeight) / maxScroll);
+    window.drawFilledRect(scrollbarX, thumbY, kScrollbarWidth, thumbHeight, Vec3{0.35F, 0.35F, 0.45F});
+  }
+
+  for (std::size_t i = 0; i < widgets_.size(); ++i) {
+    const auto& w = widgets_[i];
     int screenY = panelY + w.y - scrollOffset_;
     if (screenY + w.height < panelY || screenY > panelY + panelHeight_) {
       continue;
@@ -227,6 +244,13 @@ void UIPanel::render(Window& window, int panelX, int panelY, int panelWidth, con
 
     int textX = panelX + kPadding;
     int textY = screenY + (w.height - kLineHeight) / 2;
+
+    // Hover background
+    if (static_cast<int>(i) == hoveredWidgetIndex_ &&
+        (w.type == WidgetType::Checkbox || w.type == WidgetType::Slider || w.type == WidgetType::Button)) {
+      window.drawFilledRect(
+          panelX + 2, screenY, panelWidth_ - 4, w.height, Vec3{0.12F, 0.12F, 0.18F});
+    }
 
     switch (w.type) {
       case WidgetType::Label: {
@@ -243,17 +267,45 @@ void UIPanel::render(Window& window, int panelX, int panelY, int panelWidth, con
       case WidgetType::Checkbox: {
         bool val = w.getBool(settings);
         std::string text = val ? "[X] " + w.text : "[ ] " + w.text;
+        if (!w.hotkey.empty()) {
+          text += " " + w.hotkey;
+        }
         drawGlyphString(window, text, textX, textY, Vec3{0.9F, 0.9F, 0.9F});
         break;
       }
       case WidgetType::Slider: {
         int val = w.getInt(settings);
         std::string text = w.text + ": <" + std::to_string(val) + ">";
+        if (!w.hotkey.empty()) {
+          text += " " + w.hotkey;
+        }
         drawGlyphString(window, text, textX, textY, Vec3{0.9F, 0.9F, 0.9F});
+        break;
+      }
+      case WidgetType::Button: {
+        drawGlyphString(window, w.text, textX, textY, Vec3{1.0F, 0.85F, 0.6F});
         break;
       }
     }
   }
+}
+
+void UIPanel::setHovered(int mouseX, int mouseY)
+{
+  if (mouseX < kPadding || mouseX > panelWidth_ - kPadding || mouseY < 0 || mouseY > panelHeight_) {
+    hoveredWidgetIndex_ = -1;
+    return;
+  }
+
+  for (std::size_t i = 0; i < widgets_.size(); ++i) {
+    int widgetTop = widgets_[i].y - scrollOffset_;
+    int widgetBottom = widgetTop + widgets_[i].height;
+    if (mouseY >= widgetTop && mouseY < widgetBottom) {
+      hoveredWidgetIndex_ = static_cast<int>(i);
+      return;
+    }
+  }
+  hoveredWidgetIndex_ = -1;
 }
 
 void UIPanel::handleMouseClick(int mouseX, int mouseY, RenderSettings& settings, int direction)
@@ -279,6 +331,8 @@ void UIPanel::handleMouseClick(int mouseX, int mouseY, RenderSettings& settings,
           next = w.maxVal;
         }
         w.adjust(settings, next - cur);
+      } else if (w.type == WidgetType::Button && direction > 0 && w.action) {
+        w.action(settings);
       }
       break;
     }

@@ -142,6 +142,9 @@ void Application::update(double dt)
     if (ms.wheelDelta != 0) {
       uiPanel_.handleMouseWheel(ms.wheelDelta);
     }
+    uiPanel_.setHovered(localX, ms.y);
+  } else {
+    uiPanel_.setHovered(-1, -1);
   }
 
   camera_.updateFromInput(input_, static_cast<float>(dt));
