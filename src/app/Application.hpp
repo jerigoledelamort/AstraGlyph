@@ -4,6 +4,7 @@
 #include "platform/Time.hpp"
 #include "platform/Window.hpp"
 #include "render/AsciiFramebuffer.hpp"
+#include "render/GlyphAtlas.hpp"
 #include "render/Renderer.hpp"
 #include "render/RenderSettings.hpp"
 #include "scene/Camera.hpp"
@@ -27,6 +28,7 @@ private:
   void handleRuntimeSettingsInput();
   void updateWindowTitle();
   void renderSceneToFramebuffer();
+  void renderGlyphAtlasDebug();
   void renderGlyph(
       char glyph,
       int x,
@@ -55,6 +57,7 @@ private:
       const Vec3& textColor,
       const Vec3& backgroundColor,
       int fixedWidth = 0);
+  void rebuildGlyphAtlas(int cellW, int cellH);
   [[nodiscard]] int viewportWidth() const noexcept;
 
   Window window_;
@@ -70,6 +73,10 @@ private:
   int titleUpdateCounter_ = 0;
   bool panelVisible_{true};
   int currentPanelWidth_ = 800;
+  GlyphAtlas glyphAtlas_;
+  int lastCellW_ = 0;
+  int lastCellH_ = 0;
+  bool showGlyphAtlas_ = false;
 };
 
 } // namespace astraglyph

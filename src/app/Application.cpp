@@ -9,6 +9,8 @@
 #include <sstream>
 #include <string_view>
 
+#include "terminus_ttf_data.h"
+
 namespace astraglyph {
 namespace {
 
@@ -90,7 +92,7 @@ constexpr int kLineSpacing = 2;
 } // namespace
 
 Application::Application()
-    : window_{1280, 720, "AstraGlyph / AsciiTracer"}, baseTitle_{"AstraGlyph / AsciiTracer"}
+    : window_{1280, 720, "AstraGlyph / AsciiTracer"}, baseTitle_{"AstraGlyph / AsciiTracer"}, glyphAtlas_{font_data, font_data_len}
 {
   // Load samurai_girl scene (original with textures)
   const auto result = SceneLoader::loadFromFile("assets/scenes/cornell_box_scene.json");
@@ -100,6 +102,16 @@ Application::Application()
 
   camera_.setAspect(static_cast<float>(window_.width()) / static_cast<float>(window_.height()));
   uiPanel_.buildFromSettings(renderSettings_);
+
+  const int windowWidth = window_.width();
+  const int windowHeight = window_.height();
+  const int gridWidth = std::max(renderSettings_.gridWidth, 1);
+  const int gridHeight = std::max(renderSettings_.gridHeight, 1);
+  const int cellW = std::max(1, windowWidth / gridWidth);
+  const int cellH = std::max(1, windowHeight / gridHeight);
+  rebuildGlyphAtlas(cellW, cellH);
+  lastCellW_ = cellW;
+  lastCellH_ = cellH;
 }
 
 int Application::run()
@@ -158,6 +170,12 @@ void Application::update(double dt)
 
 void Application::render()
 {
+  if (showGlyphAtlas_) {
+    renderGlyphAtlasDebug();
+    window_.present();
+    return;
+  }
+
   renderSceneToFramebuffer();
 
   if (panelVisible_) {
@@ -207,6 +225,12 @@ void Application::renderSceneToFramebuffer()
         const int x1 = ((x + 1) * windowWidth) / gridWidth;
         const int cellWidth = std::max(1, x1 - x0);
 
+        if (cellWidth != lastCellW_ || cellHeight != lastCellH_) {
+          rebuildGlyphAtlas(cellWidth, cellHeight);
+          lastCellW_ = cellWidth;
+          lastCellH_ = cellHeight;
+        }
+
         const AsciiCell& cell = framebuffer_.at(static_cast<std::size_t>(x), static_cast<std::size_t>(y));
         const Vec3 fg = cell.fg;
         const bool filled = renderSettings_.glyphRampMode == GlyphRampMode::Filled;
@@ -237,6 +261,9 @@ void Application::handleRuntimeSettingsInput()
   }
   if (input_.wasKeyPressed(Key::F3)) {
     renderSettings_.toggleRenderProfiling();
+  }
+  if (input_.wasKeyPressed(Key::F4)) {
+    showGlyphAtlas_ = !showGlyphAtlas_;
   }
   if (input_.wasKeyPressed(Key::Digit1)) {
     renderSettings_.toggleShadows();
@@ -274,6 +301,62 @@ void Application::handleRuntimeSettingsInput()
   if (input_.wasKeyPressed(Key::Equals)) {
     renderSettings_.adjustSecondaryQuality(1);
   }
+}
+
+void Application::renderGlyphAtlasDebug()
+{
+  window_.beginFrame(Vec3{0.0F, 0.0F, 0.0F});
+
+  void* pixels = nullptr;
+  int pitch = 0;
+  const int w = window_.width();
+  const int h = window_.height();
+  if (!window_.lockFramePixels(w, h, &pixels, &pitch)) {
+    return;
+  }
+
+  auto* pixelData = static_cast<std::uint8_t*>(pixels);
+
+  // Fill black
+  for (int row = 0; row < h; ++row) {
+    for (int col = 0; col < w; ++col) {
+      std::uint8_t* p = pixelData + row * pitch + col * 4;
+      p[0] = 0;
+      p[1] = 0;
+      p[2] = 0;
+      p[3] = 255;
+    }
+  }
+
+  const std::string chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.,-/[]=# .:-=+*#%@";
+
+  const int cellW = lastCellW_;
+  const int cellH = lastCellH_;
+  if (cellW <= 0 || cellH <= 0) {
+    window_.unlockFramePixels();
+    return;
+  }
+
+  const int cols = std::max(1, w / cellW);
+  const Vec3 white{1.0F, 1.0F, 1.0F};
+  const Vec3 black{0.0F, 0.0F, 0.0F};
+
+  for (std::size_t i = 0; i < chars.size(); ++i) {
+    const int gx = static_cast<int>(i) % cols;
+    const int gy = static_cast<int>(i) / cols;
+    const int x = gx * cellW;
+    const int y = gy * cellH;
+    if (x + cellW > w || y + cellH > h) {
+      break;
+    }
+    renderCellToPixels(
+        pixelData, pitch, w, h,
+        x, y, cellW, cellH,
+        chars[i], white, black, false);
+  }
+
+  window_.unlockFramePixels();
 }
 
 void Application::renderGlyph(
@@ -354,43 +437,20 @@ void Application::renderCellToPixels(
     return;
   }
 
+  const auto& mask = glyphAtlas_.getMask(glyph);
+  const bool hasMask = !mask.empty();
+
   for (int row = y; row < y + cellHeight; ++row) {
     for (int col = x; col < x + cellWidth; ++col) {
-      setPixel(col, row, bgColor);
-    }
-  }
-
-  if (glyph == ' ') {
-    return;
-  }
-
-  const int scale = std::min(cellWidth / kGlyphPixelWidth, cellHeight / kGlyphPixelHeight);
-  if (scale <= 0) {
-    for (int row = y; row < y + cellHeight; ++row) {
-      for (int col = x; col < x + cellWidth; ++col) {
+      if (!hasMask) {
         setPixel(col, row, fgColor);
-      }
-    }
-    return;
-  }
-
-  const char character = static_cast<char>(std::toupper(static_cast<unsigned char>(glyph)));
-  const auto pattern = glyphPattern(character);
-  const int drawWidth = kGlyphPixelWidth * scale;
-  const int drawHeight = kGlyphPixelHeight * scale;
-  const int offsetX = x + (cellWidth - drawWidth) / 2;
-  const int offsetY = y + (cellHeight - drawHeight) / 2;
-
-  for (int row = 0; row < kGlyphPixelHeight; ++row) {
-    for (int column = 0; column < kGlyphPixelWidth; ++column) {
-      if (pattern[static_cast<std::size_t>(row)][static_cast<std::size_t>(column)] != '1') {
         continue;
       }
-      for (int sy = 0; sy < scale; ++sy) {
-        for (int sx = 0; sx < scale; ++sx) {
-          setPixel(offsetX + column * scale + sx, offsetY + row * scale + sy, fgColor);
-        }
-      }
+      const int mx = col - x;
+      const int my = row - y;
+      const std::size_t idx = static_cast<std::size_t>(my * cellWidth + mx);
+      const uint8_t bit = (idx < mask.size()) ? mask[idx] : 0;
+      setPixel(col, row, bit ? fgColor : bgColor);
     }
   }
 }
@@ -462,6 +522,27 @@ void Application::renderOverlayText(
     }
     y += lineAdvance;
   }
+}
+
+void Application::rebuildGlyphAtlas(int cellW, int cellH)
+{
+  std::string charset;
+  charset.reserve(64);
+  for (char c = 'A'; c <= 'Z'; ++c) {
+    charset.push_back(c);
+  }
+  for (char c = '0'; c <= '9'; ++c) {
+    charset.push_back(c);
+  }
+  const char* specials = ":.,-/[]=# ";
+  charset += specials;
+  const char* ramp = " .:-=+*#%@";
+  charset += ramp;
+
+  std::sort(charset.begin(), charset.end());
+  charset.erase(std::unique(charset.begin(), charset.end()), charset.end());
+
+  glyphAtlas_.build(cellW, cellH, charset);
 }
 
 int Application::viewportWidth() const noexcept

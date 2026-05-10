@@ -45,6 +45,7 @@ enum class Key : std::size_t {
   F1,
   F2,
   F3,
+  F4,
   F,
   Count
 };

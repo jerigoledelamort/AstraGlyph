@@ -85,6 +85,9 @@ bool tryMapKey(SDL_Keycode keycode, Key& outKey) noexcept
   case SDLK_F3:
     outKey = Key::F3;
     return true;
+  case SDLK_F4:
+    outKey = Key::F4;
+    return true;
   case SDLK_F:
     outKey = Key::F;
     return true;

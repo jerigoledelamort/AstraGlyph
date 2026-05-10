@@ -72,6 +72,7 @@ set(ASTRAGLYPH_ENGINE_SOURCES
   src/render/Renderer.cpp
   src/render/TemporalAccumulator.cpp
   src/render/AsciiMapper.cpp
+  src/render/GlyphAtlas.cpp
   src/render/Sampler.cpp
   src/render/RayTracer.cpp
   src/render/Integrator.cpp
@@ -85,11 +86,13 @@ set(ASTRAGLYPH_ENGINE_SOURCES
   src/ui/DebugOverlay.cpp
   src/ui/SettingsPanel.cpp
   src/ui/UIPanel.cpp
+  src/stb_impl.cpp
 )
 
 add_library(astraglyph_engine STATIC ${ASTRAGLYPH_ENGINE_SOURCES})
 target_include_directories(astraglyph_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_include_directories(astraglyph_engine SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+target_include_directories(astraglyph_engine SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
 target_include_directories(astraglyph_engine SYSTEM PUBLIC "${ASTRAGLYPH_JSON_INCLUDE_DIR}")
 target_link_libraries(astraglyph_engine PUBLIC ${ASTRAGLYPH_SDL3_TARGET})
 astraglyph_apply_project_options(astraglyph_engine)
