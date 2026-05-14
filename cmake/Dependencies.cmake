@@ -61,6 +61,9 @@ function(astraglyph_sdl3_bootstrap_signature out_var)
     "SDL_DUMMYAUDIO=OFF"
     "SDL_DUMMYCAMERA=OFF"
     "SDL_VIRTUAL_JOYSTICK=OFF"
+    "CMAKE_GENERATOR=${CMAKE_GENERATOR}"
+    "CMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+    "CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
   )
   list(JOIN signature_lines "\n" signature)
   set(${out_var} "${signature}" PARENT_SCOPE)
@@ -267,7 +270,9 @@ function(astraglyph_find_dependencies)
   endif()
   string(TOLOWER "${build_type}" build_type_key)
 
-  set(local_sdl3_prefix "${ASTRAGLYPH_DEPENDENCY_ROOT}/install/${build_type_key}/SDL3-${_ASTRAGLYPH_SDL3_VERSION}")
+  astraglyph_make_generator_key("${CMAKE_GENERATOR}" generator_key)
+  astraglyph_make_generator_key("${CMAKE_C_COMPILER}" compiler_key)
+  set(local_sdl3_prefix "${ASTRAGLYPH_DEPENDENCY_ROOT}/install/${generator_key}/${compiler_key}/${build_type_key}/SDL3-${_ASTRAGLYPH_SDL3_VERSION}")
   astraglyph_sdl3_bootstrap_signature(expected_signature)
   astraglyph_is_local_sdl3_ready("${local_sdl3_prefix}" "${expected_signature}" local_sdl3_ready)
 

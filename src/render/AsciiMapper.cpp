@@ -9,11 +9,11 @@
 namespace astraglyph {
 namespace {
 
-constexpr std::string_view kClassicRamp = "@#$S%?&*iI:-. ";
+constexpr std::string_view kClassicRamp = "@#$%?&*iI:-. ";
 
-constexpr std::string_view kHorizontalRamp = "#=-:. ";
-constexpr std::string_view kVerticalRamp   = "#|!:. ";
-constexpr std::string_view kDiagonalRamp   = "#/\\:. ";
+constexpr std::string_view kHorizontalRamp = "=- ";
+constexpr std::string_view kVerticalRamp   = "| ";
+constexpr std::string_view kDiagonalRamp   = "/\\ ";
 
 [[nodiscard]] std::string_view rampForMode(GlyphRampMode mode) noexcept
 {

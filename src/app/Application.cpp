@@ -329,7 +329,7 @@ void Application::renderGlyphAtlasDebug()
   }
 
   const std::string chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.,-/[]=# .:-=+*#%@";
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.,-/[]=# @#$%?&*iI:-.|\\/=";
 
   const int cellW = lastCellW_;
   const int cellH = lastCellH_;
@@ -527,7 +527,8 @@ void Application::renderOverlayText(
 void Application::rebuildGlyphAtlas(int cellW, int cellH)
 {
   std::string charset;
-  charset.reserve(64);
+  charset.reserve(128);
+  // UI / overlay characters
   for (char c = 'A'; c <= 'Z'; ++c) {
     charset.push_back(c);
   }
@@ -536,8 +537,15 @@ void Application::rebuildGlyphAtlas(int cellW, int cellH)
   }
   const char* specials = ":.,-/[]=# ";
   charset += specials;
-  const char* ramp = " .:-=+*#%@";
-  charset += ramp;
+  // ASCII ramp characters (must match AsciiMapper ramps)
+  const char* classicRamp = "@#$%?&*iI:-. ";
+  const char* horizontalRamp = "=- ";
+  const char* verticalRamp = "| ";
+  const char* diagonalRamp = "/\\ ";
+  charset += classicRamp;
+  charset += horizontalRamp;
+  charset += verticalRamp;
+  charset += diagonalRamp;
 
   std::sort(charset.begin(), charset.end());
   charset.erase(std::unique(charset.begin(), charset.end()), charset.end());
